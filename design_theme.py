@@ -79,6 +79,52 @@ button, input, textarea, select {
   border-color: var(--exa-border) !important;
 }
 
+/* Responsive readable document-search introduction and all text containers. */
+[data-testid="stMainBlockContainer"],
+[data-testid="stMainBlockContainer"] > div,
+[data-testid="stMain"] [data-testid="stHorizontalBlock"],
+[data-testid="stMain"] [data-testid="column"] {
+  min-width:0 !important;
+  box-sizing:border-box;
+}
+[data-testid="stMain"] [data-testid="stCaptionContainer"],
+[data-testid="stMain"] [data-testid="stCaptionContainer"] *,
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] li,
+[data-testid="stMain"] [data-testid="stWidgetLabel"] p {
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:normal !important;
+  text-overflow:clip !important;
+  max-width:100% !important;
+}
+.exa-search-intro {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  max-width:100%;
+  margin:2px 0 16px;
+  color:var(--exa-muted);
+  font-size:14px;
+  line-height:1.65;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+}
+.exa-search-intro span {display:block;max-width:100%;}
+@media (max-width:740px) {
+  [data-testid="stMainBlockContainer"] {padding:18px 14px 80px !important;}
+  [data-testid="stMain"] [data-testid="stHorizontalBlock"] {
+    flex-wrap:wrap !important;
+    gap:12px !important;
+  }
+  [data-testid="stMain"] [data-testid="column"] {
+    min-width:min(100%,240px) !important;
+    flex:1 1 100% !important;
+  }
+}
+
 /* Sidebar: navigation is physically before upload and API controls. */
 [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
   background: var(--exa-surface) !important;
