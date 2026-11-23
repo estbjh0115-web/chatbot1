@@ -30,6 +30,8 @@ import os
 import fitz  # PyMuPDF
 import requests
 import streamlit as st
+from supplement_ui import (clamp_page, note_page_label, note_draft_text,
+                           note_has_unsaved_draft, supplement_connection_status)
 from ux_features import (source_page, contextual_query, conversation_context,
                          version_key, switch_history, export_history)
 from feature_extras import (ANSWER_STYLES, answer_markdown, conversation_markdown,
@@ -328,6 +330,7 @@ def save_page_note(note_key: str, raw_text: str) -> dict:
     status = {"key": note_key, "chars": len(content), "indexed": indexed,
               "source": source}
     st.session_state.note_save_status = status
+    st.session_state.note_drafts.pop(note_key, None)
     return status
 
 
@@ -346,6 +349,33 @@ def render_note_feedback(note_key: str) -> None:
     if saved:
         with st.expander(f"✅ 현재 저장된 수동 보강 ({len(saved):,}자) 확인"):
             st.text(saved)
+
+
+def stash_note_draft(note_key: str, widget_key: str) -> None:
+    """Keep unsubmitted edits when a PDF page is changed."""
+    if widget_key in st.session_state:
+        st.session_state.note_drafts[note_key] = st.session_state[widget_key]
+
+
+def switch_note_page(page_widget_key: str, doc_id: str, total: int, step: int = 0) -> None:
+    """Persist current text then navigate; called as a Streamlit widget callback."""
+    old_page = st.session_state.note_last_page.get(doc_id, 1)
+    old_note_key = f"{doc_id}:{old_page}"
+    stash_note_draft(old_note_key, f"note_{old_note_key}")
+    new_page = int(st.session_state.get(page_widget_key, 1))
+    if step:
+        new_page = clamp_page(new_page, total, step)
+        st.session_state[page_widget_key] = new_page
+    st.session_state.note_last_page[doc_id] = new_page
+
+
+def note_status_counts(doc: dict, manual: dict, attached: dict) -> tuple[int, int]:
+    """Count manual notes and linked supplementary pages for the selected PDF."""
+    manual_count = sum(bool(manual.get(f"{doc['id']}:{i}", "").strip())
+                       for i in range(1, len(doc["pages"]) + 1))
+    linked_count = sum(bool(attached.get(f"{doc['id']}:{i}", "").strip())
+                       for i in range(1, len(doc["pages"]) + 1))
+    return manual_count, linked_count
 
 
 def retrieve(question: str, count: int = 8, allowed_doc_id: str = "all") -> list[dict]:
@@ -775,6 +805,7 @@ def init_state() -> None:
         "supplement_uploader_serial": 0, "active_page": PAGE_CHAT,
         "search_doc_id": "all", "answer_style": "핵심만",
         "document_search_focus": None, "note_save_status": None,
+        "note_drafts": {}, "note_last_page": {},
     }.items():
         if key not in st.session_state:
             st.session_state[key] = default
@@ -1257,6 +1288,35 @@ POLISHED_CSS = r"""
 [data-testid="stSidebar"] [data-testid="stExpander"] summary {
   font-weight:650 !important;
 }
+/* Readable annotation workspace: consistent page controls, inputs, buttons and status. */
+[data-testid="stMain"] [data-testid="stTextArea"] textarea {
+  background:#FFFFFF !important;
+  color:#182A44 !important;
+  font-size:15px !important;
+  line-height:1.65 !important;
+  border-radius:11px !important;
+  border:1px solid #C7D2E5 !important;
+}
+[data-testid="stMain"] [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+  background:#FFFFFF !important;
+  border-color:#CBD5E6 !important;
+  min-height:45px !important;
+  border-radius:10px !important;
+}
+[data-testid="stMain"] .stButton button {
+  min-height:44px !important;
+  border-radius:10px !important;
+  font-size:14px !important;
+  font-weight:650 !important;
+}
+[data-testid="stMain"] [data-testid="stWidgetLabel"] p {
+  color:#253650 !important;
+  font-size:14px !important;
+  font-weight:650 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] summary {
+  min-height:45px !important;
+}
 </style>
 """
 
@@ -1704,70 +1764,147 @@ def main() -> None:
             st.caption("기록은 현재 브라우저 세션에서만 보존됩니다. 종료 전에 다운로드하세요. 내보낸 파일에 질문·답변·근거 문구가 포함될 수 있습니다.")
 
     if active_page == PAGE_NOTES:
-        st.markdown("**보강 파일 업로드 (선택)**")
-        notes_files = st.file_uploader(
-            "TXT 또는 MD 파일", type=["txt", "md"], accept_multiple_files=True,
-            key=f"supplement_files_{st.session_state.supplement_uploader_serial}",
-            help="[파일명 p.번호] 줄 뒤에 그림이나 표 설명을 작성합니다.",
+        st.caption("PDF 원본을 확인하면서 빠진 숫자·표·그래프 설명을 추가하세요. 보강은 원본 PDF를 수정하지 않습니다.")
+
+        # 1. 작업할 문서와 페이지를 한곳에서 선택합니다.
+        doc_index = st.selectbox(
+            "작업할 PDF", range(len(docs)), format_func=lambda i: docs[i]["name"],
+            key="supplement_doc_picker",
         )
-        if notes_files:
-            incoming = [(f.name, f.getvalue()) for f in notes_files]
-            incoming_signature = "|".join(
-                f"{name}:{hashlib.sha256(data).hexdigest()}" for name, data in incoming
-            )
-            if incoming_signature != st.session_state.supplement_input_signature:
-                st.session_state.supplement_file_cache = incoming
-                st.session_state.supplement_input_signature = incoming_signature
-                st.rerun()
-        if st.session_state.supplement_file_cache:
-            st.caption("적용 중: " + ", ".join(name for name, _ in st.session_state.supplement_file_cache))
-            if st.button("보강 파일 제거", key="remove_supplement_files"):
-                st.session_state.supplement_file_cache = []
-                st.session_state.supplement_input_signature = ""
-                st.session_state.supplement_uploader_serial += 1
-                st.rerun()
-        with st.expander("보강 파일 작성 방법"):
-            st.code("[학습자료.pdf p.2]\n그림에서 A는 35%, B는 65%입니다.", language="text")
-        report = st.session_state.supplement_report
-        if st.session_state.supplement_file_cache:
-            if report.get("matched_sections"):
-                st.success(f"보강 연결 완료: {report['matched_sections']}구간 / {report['matched_pages']}페이지")
-            for warning in report.get("warnings", []):
-                st.warning(warning)
-        st.divider()
-        st.subheader("PDF 그림·표를 수동으로 보강")
-        st.info("K-EXAONE 2.5는 텍스트 전용 모델입니다. 이 페이지에서 TXT/MD 보강 파일을 올리거나 직접 설명을 입력해 주세요.")
-        doc_index = st.selectbox("대상 PDF", range(len(docs)), format_func=lambda i: docs[i]["name"])
         doc = docs[doc_index]
-        page = st.selectbox(
-            "페이지 선택",
-            options=range(1, len(doc["pages"]) + 1),
-            format_func=lambda p: f"{p}페이지",
-            key=f"supplement_page_{doc['id']}",
-            help="클릭하면 업로드한 PDF의 전체 페이지가 목록으로 표시됩니다. 원하는 페이지를 선택하세요.",
-        )
-        note_key = f"{doc['id']}:{page}"
-        left, right = st.columns([1, 1])
-        with left:
-            st.image(page_png(doc, page), caption=f"{doc['name']} · {page}페이지", use_container_width=True)
-        with right:
-            st.caption(f"페이지 출처: [{doc['name']} p.{page}]")
-            imported_note = st.session_state.file_notes.get(note_key, "")
-            if imported_note:
-                st.info(f"업로드한 보강 파일에서 이 페이지에 {len(imported_note):,}자를 연결했습니다.")
-                with st.expander("이 페이지에 연결된 보강 파일 내용", expanded=True):
-                    st.text(imported_note[:12000])
-            manual = st.text_area(
-                "그림·표 내용 수동 입력 (파일에서 연결한 내용은 별도로 유지)", value=st.session_state.visual_notes.get(note_key, ""),
-                height=220, key=f"note_{note_key}",
-                placeholder="예: 표 2. 비교 지표: A 35%, B 65%. 단위는 %이다."
+        total = len(doc["pages"])
+        doc_id = doc["id"]
+        page_widget_key = f"supplement_page_{doc_id}"
+        if page_widget_key not in st.session_state:
+            st.session_state[page_widget_key] = 1
+        if st.session_state[page_widget_key] not in range(1, total + 1):
+            st.session_state[page_widget_key] = 1
+        if doc_id not in st.session_state.note_last_page:
+            st.session_state.note_last_page[doc_id] = st.session_state[page_widget_key]
+
+        previous_col, selector_col, next_col = st.columns([1, 3, 1], vertical_alignment="bottom")
+        with previous_col:
+            st.button(
+                "◀ 이전", key=f"note_previous_{doc_id}", use_container_width=True,
+                disabled=st.session_state[page_widget_key] <= 1,
+                on_click=switch_note_page, args=(page_widget_key, doc_id, total, -1),
             )
-            if st.button("이 페이지 보강 내용 반영", type="primary"):
-                save_page_note(note_key, manual)
+        with selector_col:
+            page = st.selectbox(
+                "페이지 선택", options=range(1, total + 1),
+                format_func=lambda p: note_page_label(
+                    p, doc_id, st.session_state.visual_notes, st.session_state.file_notes
+                ),
+                key=page_widget_key,
+                on_change=switch_note_page, args=(page_widget_key, doc_id, total),
+            )
+        with next_col:
+            st.button(
+                "다음 ▶", key=f"note_next_{doc_id}", use_container_width=True,
+                disabled=st.session_state[page_widget_key] >= total,
+                on_click=switch_note_page, args=(page_widget_key, doc_id, total, 1),
+            )
+
+        note_key = f"{doc_id}:{page}"
+        saved_manual = st.session_state.visual_notes.get(note_key, "")
+        imported_note = st.session_state.file_notes.get(note_key, "")
+        manual_count, linked_count = note_status_counts(
+            doc, st.session_state.visual_notes, st.session_state.file_notes
+        )
+        st.caption(f"📄 {page}/{total}페이지  ·  직접 보강 완료 {manual_count}페이지  ·  파일 연결 {linked_count}페이지")
+
+        # 2. 원본 및 보강 편집을 한 화면에서 해결합니다.
+        preview_col, editor_col = st.columns([1.15, 1], gap="large")
+        with preview_col:
+            st.markdown("**PDF 원본 미리보기**")
+            try:
+                st.image(page_png(doc, page), use_container_width=True)
+            except Exception:
+                st.error("이 페이지를 표시하지 못했습니다. 문서 분석 메뉴에서 PDF를 확인하세요.")
+            with st.expander("PDF에서 자동 추출한 글자 보기"):
+                st.text(doc["pages"][page - 1][:4500] or "추출된 글자가 없습니다.")
+        with editor_col:
+            st.markdown("**그림·표 설명 작성**")
+            st.caption("이미지에서 확인한 값·단위·범례를 적으면 AI 검색 자료에 추가됩니다.")
+            if imported_note:
+                st.success(f"보강 파일 연결됨 · {len(imported_note):,}자")
+                with st.expander("보강 파일 내용 확인"):
+                    st.text(imported_note[:10000])
+            else:
+                st.caption("이 페이지에 연결된 보강 파일은 없습니다. 직접 작성해도 됩니다.")
+
+            widget_key = f"note_{note_key}"
+            if widget_key not in st.session_state:
+                st.session_state[widget_key] = note_draft_text(
+                    note_key, st.session_state.note_drafts, st.session_state.visual_notes
+                )
+            st.text_area(
+                "추가할 그림·표 설명", height=230, key=widget_key,
+                on_change=stash_note_draft, args=(note_key, widget_key),
+                placeholder="예: 2024년 팀 A의 킬 수는 18, 팀 B는 12입니다. 단위는 킬입니다.",
+            )
+            current_text = st.session_state[widget_key]
+            draft_changed = current_text != saved_manual
+            if draft_changed:
+                st.warning("작성 중인 변경사항이 있습니다. 저장하기 전에는 AI 답변에 반영되지 않습니다.")
+            elif saved_manual.strip():
+                st.caption(f"✅ 이 페이지의 수동 보강 {len(saved_manual):,}자 저장됨")
+            else:
+                st.caption("아직 수동 보강을 작성하지 않았습니다.")
+
+            if st.button("💾 보강 저장 · 검색 반영", type="primary",
+                         key=f"note_save_{note_key}", use_container_width=True):
+                save_page_note(note_key, current_text)
                 st.rerun()
             render_note_feedback(note_key)
-            with st.expander("추출된 페이지 텍스트"):
-                st.text(doc["pages"][page - 1][:4500] or "추출된 글자가 없습니다.")
+
+        # 3. 보강 파일 관리는 보조 영역에 배치하고 결과/오류를 분리합니다.
+        st.divider()
+        report = st.session_state.supplement_report
+        has_upload = bool(st.session_state.supplement_file_cache)
+        linked_sections, linked_pages, warning_count = supplement_connection_status(
+            report, has_upload
+        )
+        st.markdown("**TXT·MD 보강 파일 (선택 사항)**")
+        if has_upload:
+            st.success(f"연결된 보강: {linked_sections}구간 · {linked_pages}페이지")
+            if warning_count:
+                st.warning(f"연결 확인 필요 {warning_count}건 · 아래 '연결 실패 내역'에서 확인하세요.")
+            with st.expander("연결 실패 내역" + (f" ({warning_count}건)" if warning_count else "")):
+                if warning_count:
+                    for warning in report.get("warnings", []):
+                        st.write("• " + warning)
+                    st.caption("보강 파일의 [실제 업로드된 PDF 파일명 p.페이지] 표기를 확인하세요.")
+                else:
+                    st.caption("연결 실패가 확인되지 않았습니다.")
+        else:
+            st.caption("보강 파일이 없어도 오른쪽 입력창에서 수동 보강할 수 있습니다.")
+        with st.expander("파일 업로드·제거 및 작성 방법", expanded=False):
+            notes_files = st.file_uploader(
+                "TXT 또는 MD 파일 업로드", type=["txt", "md"], accept_multiple_files=True,
+                key=f"supplement_files_{st.session_state.supplement_uploader_serial}",
+                help="[파일명 p.번호] 줄 뒤에 그림이나 표 설명을 작성합니다.",
+            )
+            if notes_files:
+                incoming = [(f.name, f.getvalue()) for f in notes_files]
+                incoming_signature = "|".join(
+                    f"{name}:{hashlib.sha256(data).hexdigest()}" for name, data in incoming
+                )
+                if incoming_signature != st.session_state.supplement_input_signature:
+                    st.session_state.supplement_file_cache = incoming
+                    st.session_state.supplement_input_signature = incoming_signature
+                    st.rerun()
+            if has_upload:
+                st.caption("적용 중: " + ", ".join(
+                    name for name, _ in st.session_state.supplement_file_cache
+                ))
+                if st.button("보강 파일 제거", key="remove_supplement_files"):
+                    st.session_state.supplement_file_cache = []
+                    st.session_state.supplement_input_signature = ""
+                    st.session_state.supplement_uploader_serial += 1
+                    st.rerun()
+            st.caption("보강 파일 내용은 실제 PDF 파일명 및 페이지 번호와 정확히 일치해야 연결됩니다.")
+            st.code("[학습자료.pdf p.2]\n그림에서 A는 35%, B는 65%입니다.", language="text")
 
     if active_page == PAGE_QUIZ:
         st.subheader("PDF 기반 4지선다 퀴즈")
