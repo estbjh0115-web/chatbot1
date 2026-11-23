@@ -845,21 +845,21 @@ def render_page_title(icon: str, title: str) -> None:
 
 
 def render_header() -> None:
-    st.markdown("""
+    # Use st.html to avoid Markdown's constrained line box clipping large headings.
+    st.html("""
     <div class="page-header">
-      <div class="page-icon">📄</div>
-      <div>
-        <div class="eyebrow">EXAONE · DOCUMENT INTELLIGENCE</div>
-        <div class="heading">PDF 질의응답 챗봇</div>
+      <div class="page-icon" aria-hidden="true">📄</div>
+      <div class="page-header-text">
+        <div class="heading" role="heading" aria-level="1">PDF 질의응답 챗봇</div>
         <div class="subtitle">K-EXAONE 2.5 · PDF 분석 · 페이지 출처 확인 · 그림·표 보강 · CSV 일괄 질문 · 퀴즈</div>
       </div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def render_welcome() -> None:
     """Small, actionable first-run screen. The sidebar contains the upload control."""
-    st.markdown("### PDF를 추가하고 바로 질문해 보세요")
+    render_page_title("📄", "PDF를 추가하고 바로 질문해 보세요")
     st.write("왼쪽 **PDF 추가**에서 문서를 업로드하고, EXAONE API 키를 입력하면 시작할 수 있습니다.")
     st.info("① PDF 추가 → ② API 키 입력 → ③ 질문 작성. 보강 파일·분석·일괄 질문은 필요할 때만 선택하세요.")
     st.caption("지원 형식: PDF · 파일당 25MB / 250페이지 이하 · 스캔형 PDF는 보강 설명이 필요할 수 있습니다.")
