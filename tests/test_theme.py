@@ -64,6 +64,14 @@ class ThemeTests(unittest.TestCase):
         self.assertIn('min-height:48px;', CSS)
         self.assertIn('line-height:1.5 !important;', CSS)
 
+    def test_welcome_and_page_titles_use_html_unclipped(self):
+        self.assertIn('st.html(', APP)
+        self.assertIn('class="page-header"', APP)
+        self.assertIn('class="exa-page-title"', APP)
+        self.assertIn('min-height:98px;', CSS)
+        self.assertIn('line-height:1.65 !important;', CSS)
+        self.assertIn('max-height:none !important;', CSS)
+
     def test_no_functionality_removed(self):
         for keyword in (
             "if active_page == PAGE_NOTES:",
