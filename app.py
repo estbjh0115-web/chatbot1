@@ -293,6 +293,61 @@ def set_index() -> None:
     st.session_state.matrix = matrix
 
 
+def save_page_note(note_key: str, raw_text: str) -> dict:
+    """Save an annotation, rebuild search, and return an observable status.
+
+    This changes the AI's search context, NOT PDF bytes or extracted raw page text.
+    """
+    content = raw_text.strip()
+    if content:
+        st.session_state.visual_notes[note_key] = content
+    else:
+        st.session_state.visual_notes.pop(note_key, None)
+
+    st.session_state.csv_results = []
+    st.session_state.csv_errors = []
+    st.session_state.csv_finished = False
+    st.session_state.bulk_results = []
+    st.session_state.quiz = []
+    set_index()
+
+    doc_id, sep, page_str = note_key.partition(":")
+    try:
+        page_num = int(page_str) if sep else 0
+    except ValueError:
+        page_num = 0
+    doc = next((x for x in st.session_state.docs if x["id"] == doc_id), None)
+    source = f"[{doc['name']} p.{page_num}]" if doc else ""
+    prefix = content[:min(len(content), 28)]
+    indexed = bool(prefix) and any(
+        c["source"] == source and
+        c["text"].startswith("[해당 PDF 페이지의 보강 내용]") and
+        prefix in c["text"]
+        for c in st.session_state.chunks
+    )
+    status = {"key": note_key, "chars": len(content), "indexed": indexed,
+              "source": source}
+    st.session_state.note_save_status = status
+    return status
+
+
+def render_note_feedback(note_key: str) -> None:
+    """Confirm in-session save and explain where it is (not) visible."""
+    status = st.session_state.get("note_save_status")
+    if status and status.get("key") == note_key:
+        if status["chars"] == 0:
+            st.info("수동 보강 내용을 삭제했습니다. 검색 자료를 다시 구성했습니다.")
+        elif status["indexed"]:
+            st.success(f"✅ {status['source']} 수동 보강 {status['chars']:,}자 저장 · AI 검색 자료 반영 완료")
+        else:
+            st.warning("입력값은 저장됐지만 검색 자료 반영 여부를 확인하지 못했습니다. 문서 파일과 페이지 번호를 확인해 주세요.")
+    st.caption("수동 보강은 PDF 원본·'추출된 글자'를 수정하지 않습니다. AI 검색 자료에 별도로 추가됩니다.")
+    saved = st.session_state.visual_notes.get(note_key, "").strip()
+    if saved:
+        with st.expander(f"✅ 현재 저장된 수동 보강 ({len(saved):,}자) 확인"):
+            st.text(saved)
+
+
 def retrieve(question: str, count: int = 8, allowed_doc_id: str = "all") -> list[dict]:
     """Rank PDF evidence; a selected document is a hard retrieval boundary."""
     chunks = st.session_state.chunks
@@ -719,7 +774,7 @@ def init_state() -> None:
         "supplement_file_cache": [], "supplement_input_signature": "",
         "supplement_uploader_serial": 0, "active_page": PAGE_CHAT,
         "search_doc_id": "all", "answer_style": "핵심만",
-        "document_search_focus": None,
+        "document_search_focus": None, "note_save_status": None,
     }.items():
         if key not in st.session_state:
             st.session_state[key] = default
@@ -1311,7 +1366,14 @@ def main() -> None:
         st.session_state.docs = docs
         st.session_state.search_doc_id = "all"
         st.session_state.document_search_focus = None
-        st.session_state.visual_notes = {}
+        # Unchanged PDF files retain manual annotations when files are added or removed.
+        previous_annotations = st.session_state.visual_notes
+        valid_prefixes = tuple(f"{d['id']}:" for d in docs)
+        st.session_state.visual_notes = {
+            key: text for key, text in previous_annotations.items()
+            if valid_prefixes and key.startswith(valid_prefixes)
+        }
+        st.session_state.note_save_status = None
         st.session_state.source_focus = None
         st.session_state.quiz = []
         st.session_state.quiz_serial += 1
@@ -1514,14 +1576,9 @@ def main() -> None:
                             )
                             saved = st.form_submit_button("보강 저장 · 검색 자료 반영", type="primary")
                         if saved:
-                            st.session_state.visual_notes[selected_note_key] = new_note
-                            st.session_state.csv_results = []
-                            st.session_state.csv_errors = []
-                            st.session_state.csv_finished = False
-                            st.session_state.bulk_results = []
-                            st.session_state.quiz = []
-                            set_index()
+                            save_page_note(selected_note_key, new_note)
                             st.rerun()
+                        render_note_feedback(selected_note_key)
             else:
                 st.success(f"{LOW_TEXT_THRESHOLD}자 미만 페이지가 없습니다. 체크를 해제하면 전체 페이지를 볼 수 있습니다.")
 
@@ -1699,15 +1756,10 @@ def main() -> None:
                 height=220, key=f"note_{note_key}",
                 placeholder="예: 표 2. 비교 지표: A 35%, B 65%. 단위는 %이다."
             )
-            if st.button("이 페이지 보강 내용 반영"):
-                st.session_state.visual_notes[note_key] = manual
-                st.session_state.csv_results = []
-                st.session_state.csv_errors = []
-                st.session_state.csv_finished = False
-                st.session_state.bulk_results = []
-                st.session_state.quiz = []
-                set_index()
+            if st.button("이 페이지 보강 내용 반영", type="primary"):
+                save_page_note(note_key, manual)
                 st.rerun()
+            render_note_feedback(note_key)
             with st.expander("추출된 페이지 텍스트"):
                 st.text(doc["pages"][page - 1][:4500] or "추출된 글자가 없습니다.")
 
