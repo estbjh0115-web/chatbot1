@@ -1156,6 +1156,52 @@ POLISHED_CSS = r"""
 [data-testid="stMain"] div.stButton>button[kind="primary"] {background:#5E43D5!important; color:white!important;}
 [data-testid="stMain"] [data-testid="stAlert"] [data-testid="stMarkdownContainer"] * {color:#24344E!important;}
 @media(max-width:800px){[data-testid="stSidebar"]{width:min(90vw,310px)!important;}}
+/* Sidebar navigation: high-contrast, large, easy-to-click menu above settings. */
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {
+  gap: 5px !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label {
+  display:flex !important;
+  align-items:center !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  min-height:45px !important;
+  border:1px solid transparent !important;
+  border-radius:11px !important;
+  padding:9px 13px !important;
+  margin:0 !important;
+  color:#20314F !important;
+  background:transparent !important;
+  cursor:pointer !important;
+  transition:background-color .12s ease,border-color .12s ease;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label:hover {
+  background:#E8EDFA !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) {
+  background:#E7E3FF !important;
+  border-color:#BDB0FC !important;
+  color:#3D2A9A !important;
+  font-weight:750 !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label p,
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label span {
+  color:inherit !important;
+  font-size:15px !important;
+  font-weight:inherit !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label:focus-within {
+  outline:2px solid #5E43D5 !important;
+  outline-offset:2px !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+  background:#FFFFFF !important;
+  border:1px solid #D7DFF0 !important;
+  border-radius:11px !important;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+  font-weight:650 !important;
+}
 </style>
 """
 
@@ -1214,6 +1260,14 @@ def main() -> None:
     with st.sidebar:
         st.markdown("""<div class="sidebar-logo"><span class="symbol">📄</span>
         <div><strong>EXAONE PDF 챗봇</strong><div class="side-mini">문서 기반 AI 질의응답</div></div></div>""", unsafe_allow_html=True)
+        # 핵심 내비게이션을 사이드바 가장 위에 배치합니다.
+        st.markdown("**메뉴**")
+        st.caption("필요한 기능을 선택하세요.")
+        active_page = st.radio(
+            "화면 이동", NAVIGATION, label_visibility="collapsed", key="active_page",
+        )
+        st.divider()
+        # 업로드와 API 설정이 메뉴를 아래로 밀어내지 않게 분리했습니다.
         st.markdown("**내 문서**")
         uploaded = st.file_uploader(
             "PDF 추가", type=["pdf"], accept_multiple_files=True,
@@ -1222,21 +1276,16 @@ def main() -> None:
         )
         for uploaded_item in uploaded or []:
             st.caption(f"📄 {uploaded_item.name}")
-        st.markdown("**EXAONE API**")
-        api_key = st.text_input(
-            "API 키", type="password", value=os.environ.get("EXAONE_API_KEY", ""),
-            placeholder="API 키 입력", help="키는 GitHub 코드나 외부에 공개하지 마세요.",
-            key="exaone_api_key_widget",
-        )
-        if api_key:
-            st.caption("🔑 API 키 입력됨 · 실제 연결 여부는 설정에서 테스트")
-        else:
-            st.caption("API 키가 필요합니다. 채팅은 키 입력 후 이용할 수 있습니다.")
-        st.divider()
-        st.markdown("**메뉴**")
-        active_page = st.radio(
-            "화면 이동", NAVIGATION, label_visibility="collapsed", key="active_page",
-        )
+        with st.expander("🔑 EXAONE API 연결", expanded=False):
+            api_key = st.text_input(
+                "API 키", type="password", value=os.environ.get("EXAONE_API_KEY", ""),
+                placeholder="API 키 입력", help="키는 GitHub 코드나 외부에 공개하지 마세요.",
+                key="exaone_api_key_widget",
+            )
+            if api_key:
+                st.caption("🔑 API 키 입력됨 · 실제 연결 여부는 설정에서 테스트")
+            else:
+                st.caption("API 키가 필요합니다. 채팅은 키 입력 후 이용할 수 있습니다.")
         st.divider()
         docs_in_state = st.session_state.get("docs", [])
         if docs_in_state:
