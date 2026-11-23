@@ -696,6 +696,8 @@ def init_state() -> None:
         "csv_upload_signature": "", "csv_questions": [], "csv_parse_error": "",
         "csv_results": [], "csv_errors": [], "csv_finished": False,
         "answer_token_limit": DEFAULT_ANSWER_TOKENS, "last_api_test": "",
+        "supplement_file_cache": [], "supplement_input_signature": "",
+        "supplement_uploader_serial": 0, "active_page": PAGE_CHAT,
     }.items():
         if key not in st.session_state:
             st.session_state[key] = default
@@ -1078,6 +1080,26 @@ UI_CSS = r"""
   border:1px solid #E2E7F0 !important; border-radius:12px;
 }
 [data-testid="stMain"] [data-testid="stChatMessage"] * {opacity:1;}
+/* Minimal UX navigation: compact sidebar and clear selected page */
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+  border-radius:10px; padding:6px 8px; color:#22304C !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {
+  background:#E8E5FA !important; border:1px solid #C8BEF5;
+  font-weight:750 !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:not(:has(input:checked)):hover {
+  background:#F1F0FA !important;
+}
+[data-testid="stMain"] [data-testid="stChatMessage"] {
+  border-radius:12px;
+}
+.page-header {margin:0 0 1.1rem !important;}
+.page-header .page-icon {width:48px !important;height:48px !important;font-size:24px !important;}
+.page-header .heading {font-size:1.65rem !important;margin:0 0 4px !important;}
+.page-header .eyebrow {display:none !important;}
+.page-header .subtitle {font-size:12px !important;}
+
 </style>
 """
 
@@ -1096,95 +1118,61 @@ def render_header() -> None:
 
 
 def render_welcome() -> None:
-    st.markdown("""
-    <div class="welcome-hero">
-      <div class="hero-icon">📑</div>
-      <div>
-        <div class="hero-title">문서를 업로드하고, 필요한 답을 찾아보세요.</div>
-        <div class="hero-desc">왼쪽에서 EXAONE API 키와 PDF 파일을 등록하면 질문을 시작할 수 있습니다.<br>
-        답변과 함께 실제 검색된 PDF 페이지를 표시합니다.</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-    columns = st.columns(3, gap="medium")
-    with columns[0]:
-        st.markdown("""<div class="dashboard-card"><div class="card-heading">📄 업로드된 문서</div>
-        <div class="card-empty"><span class="big">📂</span><span class="empty-line">아직 업로드된 PDF가 없습니다.</span>
-        <span class="empty-small">왼쪽에서 PDF를 선택하세요.</span></div></div>""", unsafe_allow_html=True)
-    with columns[1]:
-        st.markdown("""<div class="dashboard-card"><div class="card-heading">💬 질문 예시</div>
-        <div class="sample">이 문서의 핵심 내용을 요약해줘.</div>
-        <div class="sample">특정 개념을 쉽게 설명해줘.</div>
-        <div class="sample">이 내용의 근거 페이지를 알려줘.</div></div>""", unsafe_allow_html=True)
-    with columns[2]:
-        st.markdown("""<div class="dashboard-card"><div class="card-heading">🕘 최근 작업</div>
-        <div class="card-empty"><span class="big">◷</span><span class="empty-line">아직 질문 내역이 없습니다.</span>
-        <span class="empty-small">업로드 후 질문하면 대화가 표시됩니다.</span></div></div>""", unsafe_allow_html=True)
-    st.caption("먼저 PDF를 올리면 답변, 검색 출처, 페이지별 글자 수 분석 기능이 활성화됩니다.")
-    st.chat_input("PDF 파일을 업로드한 후 질문할 수 있습니다.", disabled=True, key="empty_docs_chat")
+    """Small, actionable first-run screen. The sidebar contains the upload control."""
+    st.markdown("### PDF를 추가하고 바로 질문해 보세요")
+    st.write("왼쪽 **PDF 추가**에서 문서를 업로드하고, EXAONE API 키를 입력하면 시작할 수 있습니다.")
+    st.info("① PDF 추가 → ② API 키 입력 → ③ 질문 작성. 보강 파일·분석·일괄 질문은 필요할 때만 선택하세요.")
+    st.caption("지원 형식: PDF · 파일당 25MB / 250페이지 이하 · 스캔형 PDF는 보강 설명이 필요할 수 있습니다.")
+
+
+PAGE_CHAT = "💬 AI 채팅"
+PAGE_AUDIT = "📊 문서 분석"
+PAGE_NOTES = "🖼️ 그림·표 보강"
+PAGE_BULK = "📋 일괄 질문"
+PAGE_QUIZ = "📝 퀴즈"
+PAGE_SETTINGS = "⚙️ 설정"
+NAVIGATION = (PAGE_CHAT, PAGE_AUDIT, PAGE_NOTES, PAGE_BULK, PAGE_QUIZ, PAGE_SETTINGS)
+
 
 def main() -> None:
     st.set_page_config(page_title="PDF 질의응답 챗봇 · EXAONE", page_icon="📄", layout="wide", initial_sidebar_state="expanded")
     st.markdown(UI_CSS, unsafe_allow_html=True)
     init_state()
-    render_header()
-
     with st.sidebar:
-        st.markdown("""<div class="sidebar-logo"><span class="symbol">📄</span><div><strong>EXAONE PDF 챗봇</strong>
-        <div class="side-mini">PDF 문서 기반 AI 질의응답</div></div></div>""", unsafe_allow_html=True)
-        st.markdown("### ① PDF 문서 추가")
+        st.markdown("""<div class="sidebar-logo"><span class="symbol">📄</span>
+        <div><strong>EXAONE PDF 챗봇</strong><div class="side-mini">문서 기반 AI 질의응답</div></div></div>""", unsafe_allow_html=True)
+        st.markdown("**내 문서**")
         uploaded = st.file_uploader(
-            "PDF 여러 개 업로드", type=["pdf"], accept_multiple_files=True,
-            help=f"파일당 최대 {MAX_PDF_SIZE_MB}MB, {MAX_PAGES_PER_FILE}페이지",
+            "PDF 추가", type=["pdf"], accept_multiple_files=True,
+            help=f"파일당 최대 {MAX_PDF_SIZE_MB}MB / {MAX_PAGES_PER_FILE}페이지",
+            key="pdf_uploader",
         )
-        st.markdown("### ② EXAONE 연결")
+        for uploaded_item in uploaded or []:
+            st.caption(f"📄 {uploaded_item.name}")
+        st.markdown("**EXAONE API**")
         api_key = st.text_input(
             "API 키", type="password", value=os.environ.get("EXAONE_API_KEY", ""),
-            placeholder="EXAONE API 키를 입력하세요",
-            help="API 키는 GitHub 코드나 공개 채팅창에 올리지 마세요.",
+            placeholder="API 키 입력", help="키는 GitHub 코드나 외부에 공개하지 마세요.",
+            key="exaone_api_key_widget",
         )
-        st.caption("PDF 업로드 후 'PDF 질문' 탭에서 바로 질문할 수 있습니다.")
-        with st.expander("⚙️ 고급 설정 · API 테스트 · 보강 파일", expanded=False):
-            st.caption(f"사용 모델: {MODEL} / 추론 강도: {REASONING_EFFORT}")
-            st.slider(
-                "답변 최대 토큰 수 (추론 포함)",
-                min_value=1024, max_value=16384, step=1024,
-                key="answer_token_limit",
-                help="답이 비거나 길이 제한 오류가 나면 올려 주세요.",
-            )
-            if st.button("API 연결 테스트", disabled=not bool(api_key), use_container_width=True):
-                try:
-                    with st.spinner("EXAONE API 확인 중..."):
-                        reply = connection_test(api_key)
-                    st.session_state.last_api_test = "연결 성공: API 응답 수신"
-                    st.success(st.session_state.last_api_test)
-                    st.caption(reply)
-                except ExaoneError as exc:
-                    st.session_state.last_api_test = str(exc)
-                    st.error(str(exc))
-                    st.info(error_help(exc))
-            st.caption("연결 테스트는 API 1회 호출이며 이용량이 발생할 수 있습니다.")
-            uploaded_supplements = st.file_uploader(
-                "PDF 그림·표 보강 파일 (.txt / .md)",
-                type=["txt", "md"], accept_multiple_files=True,
-                help="[파일명 p.번호] 형식으로 PDF 페이지에 보강 설명을 연결합니다.",
-            )
-            with st.expander("보강 파일 작성 예시"):
-                st.code("[학습자료.pdf p.2]\n그림 1에서 A는 35%, B는 65%입니다.", language="text")
-            st.caption("보강 파일의 PDF 이름과 실제 업로드 PDF 이름이 같아야 합니다.")
-        st.caption("질문 CSV는 메인 화면의 'CSV 일괄 질문' 메뉴에서 업로드합니다.")
-        st.caption("API 키·PDF는 현재 실행 세션에서 처리됩니다. 조직 보안 규정을 확인하세요.")
+        if api_key:
+            st.caption("🔑 API 키 입력됨 · 실제 연결 여부는 설정에서 테스트")
+        else:
+            st.caption("API 키가 필요합니다. 채팅은 키 입력 후 이용할 수 있습니다.")
         st.divider()
-        if st.button("현재 대화·퀴즈·일괄 결과 초기화", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.quiz = []
-            st.session_state.grading = False
-            st.session_state.bulk_results = []
-            st.session_state.csv_results = []
-            st.session_state.csv_errors = []
-            st.session_state.csv_finished = False
-            st.rerun()
-        st.info("질문하면 관련 PDF 원문 발췌가 EXAONE API로 전송됩니다. 조직 보안 규정에 맞는 문서만 사용하세요.")
+        st.markdown("**메뉴**")
+        active_page = st.radio(
+            "화면 이동", NAVIGATION, label_visibility="collapsed", key="active_page",
+        )
+        st.divider()
+        docs_in_state = st.session_state.get("docs", [])
+        if docs_in_state:
+            st.caption(f"📄 {len(docs_in_state)}개 PDF · "
+                       f"{sum(len(d['pages']) for d in docs_in_state):,}페이지")
+        supplement_report = st.session_state.get("supplement_report", {})
+        if supplement_report.get("matched_pages"):
+            st.caption(f"✅ 보강 설명 {supplement_report['matched_pages']}페이지 적용")
+        st.caption("API 호출 시 관련 PDF 내용이 외부 EXAONE 서비스로 전송됩니다. 승인된 문서만 업로드하세요.")
 
     signature = "|".join(
         f"{f.name}:{hashlib.sha256(f.getvalue()).hexdigest()}" for f in (uploaded or [])
@@ -1211,16 +1199,12 @@ def main() -> None:
         set_index()
 
     docs = st.session_state.docs
-    if not docs:
+    if not docs and active_page != PAGE_SETTINGS:
+        render_header()
         render_welcome()
         st.stop()
-    st.markdown("""
-    <div class="welcome-hero ready"><div class="hero-icon">✅</div>
-    <div><div class="hero-title">문서 분석이 준비됐습니다.</div>
-    <div class="hero-desc">질문 탭에서 내용을 물어보세요. 상세 페이지 검토는 문서 분석 탭에서 열 수 있습니다.</div>
-    </div></div>""", unsafe_allow_html=True)
 
-    supplement_uploads = [(f.name, f.getvalue()) for f in (uploaded_supplements or [])]
+    supplement_uploads = st.session_state.supplement_file_cache
     supplement_signature = "|".join(
         f"{name}:{hashlib.sha256(data).hexdigest()}" for name, data in supplement_uploads
     ) + "::" + signature
@@ -1239,24 +1223,13 @@ def main() -> None:
         set_index()
 
     # Keep each PDF + supplement version in a separate in-session conversation.
-    current_version = version_key(signature, supplement_signature)
+    # Treat manually edited pages as a new searchable document revision.
+    manual_note_signature = hashlib.sha256(
+        json.dumps(st.session_state.visual_notes, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    current_version = version_key(signature, supplement_signature + ":" + manual_note_signature)
     version_label = ", ".join(doc["name"] for doc in docs)[:115] + f" · {current_version[:6]}"
     switch_history(st.session_state, current_version, version_label)
-
-    report = st.session_state.supplement_report
-    if supplement_uploads:
-        if report["matched_sections"]:
-            st.success(
-                f"보강 파일 연결 완료: {report['matched_sections']}개 구간 / "
-                f"PDF {report['matched_pages']}개 페이지에 적용"
-            )
-        if report["warnings"]:
-            st.warning(f"보강 파일의 미연결/주의 항목 {len(report['warnings'])}개를 확인해 주세요.")
-            with st.expander("보강 파일 연결 경고 상세", expanded=True):
-                for issue in report["warnings"]:
-                    st.write("- " + issue)
-        elif not report["matched_sections"]:
-            st.info("보강 파일에서 연결 가능한 페이지 표기를 찾지 못했습니다.")
 
     total_pages = sum(len(doc["pages"]) for doc in docs)
     raw_chars = sum(len(page) for doc in docs for page in doc["pages"])
@@ -1266,11 +1239,22 @@ def main() -> None:
     )
     total_chars = raw_chars + bonus_chars
     readable_pages = sum(bool(page.strip()) for doc in docs for page in doc["pages"])
-    st.caption(f"📄 {len(docs)}개 PDF · {total_pages:,}페이지 · 텍스트 {raw_chars:,}자 · 보강 {bonus_chars:,}자")
-    tab_chat, tab_audit, tab_notes, tab_quiz, tab_bulk = st.tabs([
-        "💬 PDF 질문", "📊 문서 분석", "🖼️ 그림·표 보강", "📝 퀴즈", "📋 CSV 일괄 질문"
-    ])
-    with tab_audit:
+    if active_page == PAGE_CHAT:
+        st.markdown("### 💬 AI 채팅")
+        st.caption(f"📄 {len(docs)}개 문서 · {total_pages:,}페이지 · "
+                   f"본문 {raw_chars:,}자 · 보강 {bonus_chars:,}자 · 근거 페이지를 클릭해 확인하세요")
+    elif active_page == PAGE_AUDIT:
+        st.markdown("### 📊 문서 분석")
+    elif active_page == PAGE_NOTES:
+        st.markdown("### 🖼️ 그림·표 보강")
+    elif active_page == PAGE_BULK:
+        st.markdown("### 📋 일괄 질문")
+    elif active_page == PAGE_QUIZ:
+        st.markdown("### 📝 퀴즈")
+    elif active_page == PAGE_SETTINGS:
+        st.markdown("### ⚙️ 설정")
+
+    if active_page == PAGE_AUDIT:
         col1, col2, col3 = st.columns(3)
         col1.metric("PDF 수", f"{len(docs):,}개")
         col2.metric("전체 페이지 수", f"{total_pages:,}페이지")
@@ -1380,27 +1364,29 @@ def main() -> None:
                             st.session_state.csv_errors = []
                             st.session_state.csv_finished = False
                             st.session_state.bulk_results = []
-                            st.session_state.messages = []
                             st.session_state.quiz = []
                             set_index()
                             st.rerun()
             else:
                 st.success(f"{LOW_TEXT_THRESHOLD}자 미만 페이지가 없습니다. 체크를 해제하면 전체 페이지를 볼 수 있습니다.")
 
-    with tab_chat:
-        st.subheader("💬 문서 내용 질문하기")
-        st.caption("문서의 실제 원문을 검색합니다. '그때', '그러면' 같은 후속 질문도 이전 대화 맥락으로 검색합니다.")
+    if active_page == PAGE_CHAT:
+        if not st.session_state.messages:
+            st.caption("문서의 내용이나 수치를 질문해 보세요. 후속 질문도 이전 대화를 참고합니다.")
         examples = [
             "이 문서의 핵심 내용을 요약해줘.",
             "주요 수치와 조건을 정리해줘.",
             "문서의 결론과 근거 페이지는?",
         ]
         suggested_question = None
-        for idx, (column, example) in enumerate(zip(st.columns(3), examples)):
-            with column:
-                if st.button(example, key=f"example_question_{idx}", use_container_width=True):
-                    suggested_question = example
-        chat_col, preview_col = st.columns([1.55, 1], gap="large")
+        if not st.session_state.messages:
+            for idx, (column, example) in enumerate(zip(st.columns(3), examples)):
+                with column:
+                    if st.button(example, key=f"example_question_{idx}", use_container_width=True):
+                        suggested_question = example
+        focused = st.session_state.source_focus
+        chat_col, preview_col = (st.columns([1.7, 1], gap="large")
+                                 if focused else (st.container(), None))
         with chat_col:
             for i, message in enumerate(st.session_state.messages):
                 with st.chat_message(message["role"]):
@@ -1433,25 +1419,26 @@ def main() -> None:
                         answer, evidence = f"요청 실패: {exc}\n\n해결 방법: {error_help(exc)}", []
                 st.session_state.messages.append({"role": "assistant", "content": answer, "evidence": evidence})
                 st.rerun()
-        with preview_col:
-            focus = st.session_state.source_focus
-            selected_doc = next((d for d in docs if focus and d["id"] == focus.get("doc_id")), None)
-            page_no = focus.get("page") if focus else None
-            if selected_doc and isinstance(page_no, int) and 1 <= page_no <= len(selected_doc["pages"]):
-                st.markdown("**📖 선택한 근거 원본**")
-                st.caption(f"{selected_doc['name']} · {page_no}페이지")
-                try:
-                    st.image(page_png(selected_doc, page_no), use_container_width=True)
-                except Exception:
-                    st.warning("PDF 페이지 미리보기를 불러오지 못했습니다.")
-                st.download_button("원본 PDF 다운로드", data=selected_doc["bytes"],
-                                   file_name=selected_doc["name"], mime="application/pdf",
-                                   key="source_pdf_download")
-                if st.button("미리보기 닫기", key="close_source_view"):
-                    st.session_state.source_focus = None
-                    st.rerun()
-            else:
-                st.info("답변 아래의 📖 출처 버튼을 누르면 해당 PDF 페이지가 이곳에 표시됩니다.")
+        if preview_col is not None:
+            with preview_col:
+                focus = st.session_state.source_focus
+                selected_doc = next((d for d in docs if focus and d["id"] == focus.get("doc_id")), None)
+                page_no = focus.get("page") if focus else None
+                if selected_doc and isinstance(page_no, int) and 1 <= page_no <= len(selected_doc["pages"]):
+                    st.markdown("**📖 선택한 근거 원본**")
+                    st.caption(f"{selected_doc['name']} · {page_no}페이지")
+                    try:
+                        st.image(page_png(selected_doc, page_no), use_container_width=True)
+                    except Exception:
+                        st.warning("PDF 페이지 미리보기를 불러오지 못했습니다.")
+                    st.download_button("원본 PDF 다운로드", data=selected_doc["bytes"],
+                                       file_name=selected_doc["name"], mime="application/pdf",
+                                       key="source_pdf_download")
+                    if st.button("미리보기 닫기", key="close_source_view"):
+                        st.session_state.source_focus = None
+                        st.rerun()
+                else:
+                    st.info("답변 아래의 📖 출처 버튼을 누르면 해당 PDF 페이지가 이곳에 표시됩니다.")
 
         with st.expander("🕘 이전 대화 보기 · 기록 다운로드", expanded=False):
             archives = st.session_state.chat_archives
@@ -1471,9 +1458,40 @@ def main() -> None:
                 file_name="exaone_chat_history.json", mime="application/json")
             st.caption("기록은 현재 브라우저 세션에서만 보존됩니다. 종료 전에 다운로드하세요. 내보낸 파일에 질문·답변·근거 문구가 포함될 수 있습니다.")
 
-    with tab_notes:
+    if active_page == PAGE_NOTES:
+        st.markdown("**보강 파일 업로드 (선택)**")
+        notes_files = st.file_uploader(
+            "TXT 또는 MD 파일", type=["txt", "md"], accept_multiple_files=True,
+            key=f"supplement_files_{st.session_state.supplement_uploader_serial}",
+            help="[파일명 p.번호] 줄 뒤에 그림이나 표 설명을 작성합니다.",
+        )
+        if notes_files:
+            incoming = [(f.name, f.getvalue()) for f in notes_files]
+            incoming_signature = "|".join(
+                f"{name}:{hashlib.sha256(data).hexdigest()}" for name, data in incoming
+            )
+            if incoming_signature != st.session_state.supplement_input_signature:
+                st.session_state.supplement_file_cache = incoming
+                st.session_state.supplement_input_signature = incoming_signature
+                st.rerun()
+        if st.session_state.supplement_file_cache:
+            st.caption("적용 중: " + ", ".join(name for name, _ in st.session_state.supplement_file_cache))
+            if st.button("보강 파일 제거", key="remove_supplement_files"):
+                st.session_state.supplement_file_cache = []
+                st.session_state.supplement_input_signature = ""
+                st.session_state.supplement_uploader_serial += 1
+                st.rerun()
+        with st.expander("보강 파일 작성 방법"):
+            st.code("[학습자료.pdf p.2]\n그림에서 A는 35%, B는 65%입니다.", language="text")
+        report = st.session_state.supplement_report
+        if st.session_state.supplement_file_cache:
+            if report.get("matched_sections"):
+                st.success(f"보강 연결 완료: {report['matched_sections']}구간 / {report['matched_pages']}페이지")
+            for warning in report.get("warnings", []):
+                st.warning(warning)
+        st.divider()
         st.subheader("PDF 그림·표를 수동으로 보강")
-        st.info("K-EXAONE 2.5는 텍스트 전용 모델입니다. PDF 그림·표는 사이드바의 .txt/.md 보강 파일 또는 이 화면의 수동 입력으로 보강하세요.")
+        st.info("K-EXAONE 2.5는 텍스트 전용 모델입니다. 이 페이지에서 TXT/MD 보강 파일을 올리거나 직접 설명을 입력해 주세요.")
         doc_index = st.selectbox("대상 PDF", range(len(docs)), format_func=lambda i: docs[i]["name"])
         doc = docs[doc_index]
         page = st.number_input("페이지 번호", min_value=1, max_value=len(doc["pages"]), value=1, step=1)
@@ -1499,14 +1517,13 @@ def main() -> None:
                 st.session_state.csv_errors = []
                 st.session_state.csv_finished = False
                 st.session_state.bulk_results = []
-                st.session_state.messages = []
                 st.session_state.quiz = []
                 set_index()
                 st.rerun()
             with st.expander("추출된 페이지 텍스트"):
                 st.text(doc["pages"][page - 1][:4500] or "추출된 글자가 없습니다.")
 
-    with tab_quiz:
+    if active_page == PAGE_QUIZ:
         st.subheader("PDF 기반 4지선다 퀴즈")
         st.caption("기존 프로젝트의 추가 학습 기능입니다. 퀴즈 정답·해설은 AI 생성 결과로 원본 검수가 필요합니다.")
         c1, c2 = st.columns(2)
@@ -1548,7 +1565,7 @@ def main() -> None:
             st.download_button("문제·정답·해설 TXT", quiz_text(st.session_state.quiz).encode(),
                                file_name="pdf_quiz.txt", mime="text/plain")
 
-    with tab_bulk:
+    if active_page == PAGE_BULK:
         st.subheader("📋 CSV 일괄 질문")
         st.caption("id,질문 열이 있는 CSV를 업로드하면 결과를 id,질문,답변 CSV로 내려받습니다.")
         uploaded_question_csv = st.file_uploader(
@@ -1558,9 +1575,9 @@ def main() -> None:
         csv_file_bytes = uploaded_question_csv.getvalue() if uploaded_question_csv is not None else None
         csv_upload_signature = (
             f"{uploaded_question_csv.name}:{hashlib.sha256(csv_file_bytes).hexdigest()}"
-            if csv_file_bytes is not None else ""
+            if csv_file_bytes is not None else st.session_state.csv_upload_signature
         )
-        if csv_upload_signature != st.session_state.csv_upload_signature:
+        if csv_file_bytes is not None and csv_upload_signature != st.session_state.csv_upload_signature:
             st.session_state.csv_upload_signature = csv_upload_signature
             st.session_state.csv_questions = []
             st.session_state.csv_parse_error = ""
@@ -1575,7 +1592,7 @@ def main() -> None:
 
         st.caption(f"최대 {MAX_QUESTION_CSV_ROWS}문항 · 문항마다 API가 1회씩 호출될 수 있습니다.")
         start_csv_batch = st.button("일괄 질문 실행", type="primary",
-                                    disabled=not bool(api_key) or uploaded_question_csv is None or not bool(st.session_state.chunks),
+                                    disabled=not bool(api_key) or not bool(st.session_state.csv_questions) or not bool(st.session_state.chunks),
                                     use_container_width=True)
         if st.session_state.csv_parse_error:
             st.error(st.session_state.csv_parse_error)
@@ -1588,7 +1605,7 @@ def main() -> None:
                     hide_index=True, use_container_width=True,
                 )
         else:
-            st.info("사이드바에 질문 CSV를 업로드해 주세요. 헤더는 id,질문입니다.")
+            st.info("여기에서 질문 CSV를 업로드해 주세요. 헤더는 id,질문입니다.")
 
         if start_csv_batch:
             if st.session_state.csv_parse_error or not st.session_state.csv_questions:
@@ -1682,9 +1699,38 @@ def main() -> None:
             st.download_button("답변 CSV 다운로드", csv_bytes(st.session_state.bulk_results),
                                file_name="exaone_pdf_answers.csv", mime="text/csv")
 
-    st.divider()
-    with st.expander("🛠️ 오류 진단 · 해결 방법"):
-        st.markdown("""**ModuleNotFoundError**: 터미널에서 `python -m pip install -r requirements.txt` 실행 후 앱을 재시작하세요.
+    if active_page == PAGE_SETTINGS:
+        st.caption(f"현재 모델: {MODEL} · 추론 강도: {REASONING_EFFORT}")
+        st.slider(
+            "답변 최대 토큰 수 (추론 포함)",
+            min_value=1024, max_value=16384, step=1024,
+            key="answer_token_limit", help="답변이 길이 제한에 걸리면 올려 주세요.",
+        )
+        if st.button("EXAONE API 연결 테스트", disabled=not bool(api_key)):
+            try:
+                with st.spinner("연결 상태 확인 중..."):
+                    reply = connection_test(api_key)
+                st.success("API 응답 수신 성공")
+                st.caption(reply)
+            except ExaoneError as exc:
+                st.error(str(exc))
+                st.info(error_help(exc))
+        st.caption("테스트는 API 1회 호출이며 이용량이 발생할 수 있습니다.")
+        st.divider()
+        st.markdown("**현재 결과 초기화**")
+        clear_confirm = st.checkbox("현재 대화·퀴즈·일괄 결과를 삭제하는 데 동의합니다.", key="confirm_clear")
+        if st.button("결과 초기화", disabled=not clear_confirm):
+            st.session_state.messages = []
+            st.session_state.quiz = []
+            st.session_state.grading = False
+            st.session_state.bulk_results = []
+            st.session_state.csv_results = []
+            st.session_state.csv_errors = []
+            st.session_state.csv_finished = False
+            st.rerun()
+        st.divider()
+        with st.expander("🛠️ 오류 진단 · 해결 방법"):
+            st.markdown("""**ModuleNotFoundError**: 터미널에서 `python -m pip install -r requirements.txt` 실행 후 앱을 재시작하세요.
 
 **HTTP 401/403**: EXAONE 키를 비밀번호 입력란에 다시 입력하고 사용 권한을 확인하세요. API 키를 오류 화면·채팅에 붙여 넣지 마세요.
 
@@ -1697,9 +1743,9 @@ def main() -> None:
 **파일 오류**: PDF가 암호화되었거나 너무 크지 않은지, CSV 헤더가 `id,질문`인지 확인하세요.
 
 **설치·테스트**: Codespaces 터미널에서 `python verify_install.py` 및 `python -m unittest discover -s tests -v`를 실행하세요.""")
-        st.caption(f"모델 {MODEL} / 엔드포인트 {API_URL} / 추론 {REASONING_EFFORT} · API 키 미표시")
-    st.divider()
-    st.caption("주의: 근거 페이지 표기는 검색·생성 결과를 기반으로 하므로 중요 답변은 원본 PDF와 대조하세요. 스캔 PDF 그림/표는 기본 텍스트 추출에 포함되지 않습니다.")
+            st.caption(f"모델 {MODEL} / 엔드포인트 {API_URL} / 추론 {REASONING_EFFORT} · API 키 미표시")
+        st.divider()
+        st.caption("주의: 근거 페이지 표기는 검색·생성 결과를 기반으로 하므로 중요 답변은 원본 PDF와 대조하세요. 스캔 PDF 그림/표는 기본 텍스트 추출에 포함되지 않습니다.")
 
 
 if __name__ == "__main__":
