@@ -1371,6 +1371,11 @@ def main() -> None:
             )
 
         note_key = f"{doc_id}:{page}"
+        # After an explicit approval, refresh editor content before its widget is created.
+        if st.session_state.get("visual_review_approved_page") == note_key:
+            st.session_state[f"note_{note_key}"] = st.session_state.visual_notes.get(note_key, "")
+            st.session_state.pop(f"visual_review_{note_key}", None)
+            st.session_state.pop("visual_review_approved_page", None)
         saved_manual = st.session_state.visual_notes.get(note_key, "")
         imported_note = st.session_state.file_notes.get(note_key, "")
         manual_count, linked_count = note_status_counts(
@@ -1533,8 +1538,7 @@ def main() -> None:
                               if saved_manual.strip() else reviewed)
                     result = save_page_note(note_key, merged)
                     if result.get("indexed"):
-                        st.session_state.pop(review_key, None)
-                        st.success("검토한 보강 내용을 이 PDF 페이지의 검색 자료에 저장했습니다.")
+                        st.session_state["visual_review_approved_page"] = note_key
                         st.rerun()
                     else:
                         st.error("검색 인덱스를 확인하지 못했습니다. 페이지를 다시 선택하세요.")
