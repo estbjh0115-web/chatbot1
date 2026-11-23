@@ -943,6 +943,131 @@ UI_CSS = r"""
 }
 /* Alert messages should keep their own status colors. */
 [data-testid="stMain"] [data-testid="stAlert"] [data-testid="stMarkdownContainer"] * {color: inherit !important;}
+
+/* EXAONE LIGHT-MODE OVERRIDE v3: browser/Streamlit light mode */
+:root {color-scheme:light !important;}
+[data-testid="stAppViewContainer"], [data-testid="stMain"], [data-testid="stHeader"] {
+  background: #F5F7FC !important;
+}
+[data-testid="stMain"] {
+  --text-color:#1B2540 !important;
+  --background-color:#F5F7FC !important;
+  --secondary-background-color:#FFFFFF !important;
+  --border-color:#D8DEED !important;
+  color:#1B2540 !important;
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"],
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] :is(p,li,h1,h2,h3,h4,h5,h6,strong,em),
+[data-testid="stMain"] [data-testid="stWidgetLabel"],
+[data-testid="stMain"] [data-testid="stWidgetLabel"] *,
+[data-testid="stMain"] label {
+  color:#1B2540 !important; opacity:1 !important;
+}
+[data-testid="stMain"] [data-testid="stCaptionContainer"],
+[data-testid="stMain"] [data-testid="stCaptionContainer"] * {
+  color:#51617C !important; opacity:1 !important;
+}
+[data-testid="stMain"] [data-testid="stMetric"] {
+  background:#FFFFFF !important; border:1px solid #D9DFEC !important;
+  box-shadow:0 5px 18px rgba(30,43,77,.045);
+}
+[data-testid="stMain"] [data-testid="stMetricLabel"],
+[data-testid="stMain"] [data-testid="stMetricLabel"] * {
+  color:#52607B !important;
+}
+[data-testid="stMain"] [data-testid="stMetricValue"],
+[data-testid="stMain"] [data-testid="stMetricValue"] * {
+  color:#1B2540 !important;
+}
+[data-testid="stMain"] [data-testid="stMetricDelta"] * {color:#2B5273 !important;}
+[data-testid="stMain"] [data-testid="stExpander"] {
+  background:#FFFFFF !important; color:#1B2540 !important;
+  border:1px solid #CDD5E8 !important;
+  box-shadow:0 2px 10px rgba(29,45,75,.035);
+}
+[data-testid="stMain"] [data-testid="stExpander"] details > summary,
+[data-testid="stMain"] [data-testid="stExpander"] details > summary *,
+[data-testid="stMain"] [data-testid="stExpander"] [data-testid="stMarkdownContainer"] * {
+  color:#1B2540 !important; opacity:1 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] details > summary svg,
+[data-testid="stMain"] [data-testid="stExpanderToggleIcon"] {
+  color:#364760 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] details[open] > summary {
+  background:#EDF1FC !important;
+  border-bottom:1px solid #D4DBEC !important;
+}
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"],
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"] * {
+  color:#40506F !important;
+}
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"] * {
+  color:#5836BA !important;
+}
+[data-testid="stMain"] [data-testid="stChatInput"] textarea,
+[data-testid="stMain"] [data-testid="stTextArea"] textarea,
+[data-testid="stMain"] [data-testid="stTextInput"] input,
+[data-testid="stMain"] [data-testid="stNumberInput"] input {
+  background:#FFFFFF !important;
+  color:#1B2540 !important;
+  caret-color:#6842C8 !important;
+}
+[data-testid="stMain"] [data-testid="stChatInput"] textarea::placeholder,
+[data-testid="stMain"] [data-testid="stTextArea"] textarea::placeholder,
+[data-testid="stMain"] [data-testid="stTextInput"] input::placeholder {
+  color:#62718C !important; opacity:1 !important;
+}
+[data-testid="stMain"] [data-testid="stCodeBlock"] pre,
+[data-testid="stMain"] [data-testid="stCodeBlock"] code {
+  background:#EFF2FA !important; color:#1B2540 !important;
+}
+[data-testid="stMain"] [data-testid="stAlert"] [data-testid="stMarkdownContainer"],
+[data-testid="stMain"] [data-testid="stAlert"] [data-testid="stMarkdownContainer"] * {
+  color:#1B2540 !important;
+}
+[data-testid="stMain"] [data-testid="stDataFrame"] {
+  background:#FFFFFF !important; color:#1B2540 !important;
+}
+/* Custom dashboard components */
+.page-header .eyebrow {color:#6B4BB3 !important;}
+.page-header .heading {color:#18223D !important;}
+.page-header .subtitle {color:#4E5E7B !important;}
+.page-header .page-icon {
+  background:linear-gradient(145deg,#F0E9FF,#D3C2FF);
+  box-shadow:0 7px 18px rgba(105,76,164,.12);
+}
+.welcome-hero {
+  background:linear-gradient(110deg,#F1EBFF 0%,#ECEEFE 100%) !important;
+  border:1px solid #C9B9F0 !important;
+  box-shadow:0 6px 24px rgba(64,50,113,.07) !important;
+}
+.welcome-hero .hero-icon {border-right-color:#C6BAE7 !important;}
+.welcome-hero .hero-title {color:#241F48 !important;}
+.welcome-hero .hero-desc {color:#475478 !important;}
+.dashboard-card {
+  background:#FFFFFF !important;
+  border:1px solid #D8DFEC !important;
+  box-shadow:0 5px 18px rgba(27,46,78,.045);
+}
+.dashboard-card .card-heading {color:#202B44 !important;}
+.dashboard-card .card-empty {border-color:#D8DFF0 !important; background:#FAFBFE !important;}
+.dashboard-card .card-empty .empty-line {color:#485976 !important;}
+.dashboard-card .card-empty .empty-small {color:#64728B !important;}
+.dashboard-card .sample {background:#F2F0FC !important; color:#2E3356 !important;}
+.dashboard-footnote {color:#52607C !important;}
+/* Neutralize generic Streamlit secondary buttons, form inputs and chat results. */
+[data-testid="stMain"] button[data-testid="stBaseButton-secondary"] {
+  background:#FFFFFF !important; border:1px solid #CBD3E7 !important;
+  color:#263352 !important;
+}
+[data-testid="stMain"] button[data-testid="stBaseButton-secondary"] * {color:#263352 !important;}
+[data-testid="stMain"] [data-testid="stChatMessage"] {
+  background:#FFFFFF !important; color:#1B2540 !important;
+  border:1px solid #E2E7F0 !important; border-radius:12px;
+}
+[data-testid="stMain"] [data-testid="stChatMessage"] * {opacity:1;}
 </style>
 """
 
