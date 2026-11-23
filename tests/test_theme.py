@@ -37,6 +37,13 @@ class ThemeTests(unittest.TestCase):
         self.assertLess(sidebar.index("active_page = st.radio("),
                         sidebar.index("uploaded = st.file_uploader("))
 
+    def test_search_description_wraps_in_two_lines(self):
+        self.assertIn('class="exa-search-intro"', APP)
+        self.assertIn('<span>AI API를 호출하지 않습니다.</span>', APP)
+        self.assertIn('white-space:normal !important;', CSS)
+        self.assertIn('overflow-wrap:anywhere !important;', CSS)
+        self.assertIn('.exa-search-intro span', CSS)
+
     def test_no_functionality_removed(self):
         for keyword in (
             "if active_page == PAGE_NOTES:",
