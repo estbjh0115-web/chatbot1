@@ -1,10 +1,11 @@
-# 밝은 테마: 메인과 사이드바의 글씨를 선명하게 표시
+# EXAONE PDF chatbot - modern minimal light design
+# CSS in design_theme.py loads Pretendard Variable with system Korean fallbacks.
 [theme]
 base = "light"
-primaryColor = "#6645DF"
-backgroundColor = "#F5F7FC"
+primaryColor = "#6554D9"
+backgroundColor = "#F7F9FC"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1B2540"
+textColor = "#1F2937"
 font = "sans serif"
 
 [server]
