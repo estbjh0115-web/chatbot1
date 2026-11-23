@@ -30,7 +30,7 @@ import os
 import fitz  # PyMuPDF
 import requests
 import streamlit as st
-from supplement_ui import (clamp_page, note_page_label, note_draft_text,
+from supplement_ui import (clamp_page, coerce_page_number, note_page_label, note_draft_text,
                            note_has_unsaved_draft, supplement_connection_status)
 from ux_features import (source_page, contextual_query, conversation_context,
                          version_key, switch_history, export_history)
@@ -359,10 +359,10 @@ def stash_note_draft(note_key: str, widget_key: str) -> None:
 
 def switch_note_page(page_widget_key: str, doc_id: str, total: int, step: int = 0) -> None:
     """Persist current text then navigate; called as a Streamlit widget callback."""
-    old_page = st.session_state.note_last_page.get(doc_id, 1)
+    old_page = coerce_page_number(st.session_state.note_last_page.get(doc_id, 1), total)
     old_note_key = f"{doc_id}:{old_page}"
     stash_note_draft(old_note_key, f"note_{old_note_key}")
-    new_page = int(st.session_state.get(page_widget_key, 1))
+    new_page = coerce_page_number(st.session_state.get(page_widget_key, 1), total)
     if step:
         new_page = clamp_page(new_page, total, step)
         st.session_state[page_widget_key] = new_page
@@ -1777,8 +1777,9 @@ def main() -> None:
         page_widget_key = f"supplement_page_{doc_id}"
         if page_widget_key not in st.session_state:
             st.session_state[page_widget_key] = 1
-        if st.session_state[page_widget_key] not in range(1, total + 1):
-            st.session_state[page_widget_key] = 1
+        st.session_state[page_widget_key] = coerce_page_number(
+            st.session_state[page_widget_key], total
+        )
         if doc_id not in st.session_state.note_last_page:
             st.session_state.note_last_page[doc_id] = st.session_state[page_widget_key]
 
@@ -1791,13 +1792,14 @@ def main() -> None:
             )
         with selector_col:
             page = st.selectbox(
-                "페이지 선택", options=range(1, total + 1),
+                "페이지 선택", options=list(range(1, total + 1)),
                 format_func=lambda p: note_page_label(
                     p, doc_id, st.session_state.visual_notes, st.session_state.file_notes
                 ),
                 key=page_widget_key,
                 on_change=switch_note_page, args=(page_widget_key, doc_id, total),
             )
+            page = coerce_page_number(page, total)
         with next_col:
             st.button(
                 "다음 ▶", key=f"note_next_{doc_id}", use_container_width=True,
