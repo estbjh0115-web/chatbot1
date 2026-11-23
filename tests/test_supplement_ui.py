@@ -8,6 +8,19 @@ from supplement_ui import (
 
 
 class SupplementUXTests(unittest.TestCase):
+    def test_formatted_page_label_does_not_crash(self):
+        from supplement_ui import coerce_page_number
+        self.assertEqual(coerce_page_number("5페이지 · 보강 없음", 9), 5)
+        self.assertEqual(coerce_page_number("5페이지 · 직접 보강 완료", 9), 5)
+        self.assertEqual(coerce_page_number("5페이지 · 보강 파일 연결", 9), 5)
+        self.assertEqual(coerce_page_number(" 2페이지 ", 9), 2)
+        self.assertEqual(coerce_page_number("7", 9), 7)
+        self.assertEqual(coerce_page_number(4, 9), 4)
+        self.assertEqual(coerce_page_number("999페이지 · 보강 없음", 9), 9)
+        self.assertEqual(coerce_page_number("알 수 없는 페이지", 9), 1)
+        with self.assertRaises(ValueError):
+            coerce_page_number("1페이지", 0)
+
     def test_previous_next_page_boundaries(self):
         self.assertEqual(clamp_page(1, 7, -1), 1)
         self.assertEqual(clamp_page(7, 7, 1), 7)
