@@ -190,6 +190,18 @@ button, input, textarea, select {
   text-overflow:clip !important;
 }
 
+/* Heading-specific paint box: keep glyph ascent/descenders fully visible. */
+[data-testid="stHtml"] .page-header,
+[data-testid="stHtml"] .exa-page-title,
+[data-testid="stHtml"] .page-header .heading,
+[data-testid="stHtml"] .exa-page-title-label {
+  overflow:visible !important;
+  height:auto !important;
+  max-height:none !important;
+  text-overflow:clip !important;
+  -webkit-line-clamp:unset !important;
+}
+
 /* Stable page headings: prevent oversized Markdown h3 glyph/emoji clipping. */
 .exa-page-title {
   display:flex;
@@ -451,14 +463,30 @@ button, input, textarea, select {
 }
 
 /* Custom dashboard blocks retained for legacy screens and document overview. */
-.page-header {display:flex; align-items:center; gap:14px; margin:6px 0 22px;}
+.page-header {
+  display:flex; align-items:center; gap:14px;
+  width:100%; min-height:98px; height:auto !important;
+  margin:6px 0 22px; padding:14px 0;
+  overflow:visible !important; box-sizing:border-box;
+}
+.page-header .page-header-text {
+  min-width:0; flex:1 1 auto; height:auto !important;
+  overflow:visible !important; padding:4px 0;
+}
 .page-header .page-icon {
   display:grid; place-items:center; flex-shrink:0;
   width:50px; height:50px; border-radius:12px; font-size:26px;
   background:#EDEAFF; color:var(--exa-primary);
 }
 .page-header .eyebrow {display:none;}
-.page-header .heading {font-size:28px; font-weight:750; color:var(--exa-text); line-height:1.3; letter-spacing:-.035em;}
+.page-header .heading {
+  display:block; width:100%; height:auto !important;
+  min-height:48px; padding:7px 0;
+  font-size:28px; font-weight:750; color:var(--exa-text);
+  line-height:1.65 !important; letter-spacing:-.025em;
+  overflow:visible !important; white-space:normal !important;
+  overflow-wrap:anywhere; box-sizing:border-box;
+}
 .page-header .subtitle {font-size:13px; color:var(--exa-muted); line-height:1.55; margin-top:4px;}
 .welcome-hero {
   display:flex;align-items:center;gap:20px;
