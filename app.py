@@ -1011,7 +1011,13 @@ def main() -> None:
         st.markdown("### ⚙️ 설정")
 
     if active_page == PAGE_SEARCH:
-        st.caption("PDF 원문에서 단어나 문장을 바로 찾습니다. AI API를 호출하지 않습니다.")
+        st.markdown(
+            '<div class="exa-search-intro">'
+            '<span>PDF 원문에서 단어나 문장을 바로 찾습니다.</span>'
+            '<span>AI API를 호출하지 않습니다.</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         search_col, doc_col = st.columns([2.4, 1.2], gap="medium")
         with search_col:
             keyword = st.text_input("검색할 단어 또는 문장", placeholder="예: T1, 월드 챔피언십, 2024",
