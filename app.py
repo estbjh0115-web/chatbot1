@@ -32,6 +32,10 @@ import requests
 import streamlit as st
 from design_theme import APP_CSS
 from ui_help import help_heading
+from visual_analysis import (page_visual_hints, render_page_png, extract_page_ocr,
+                             extract_native_tables, analyze_page_vision,
+                             append_review_draft, ocr_available_languages,
+                             VisualAnalysisError, VISION_MODEL)
 from supplement_ui import (clamp_page, coerce_page_number, note_page_label, note_draft_text,
                            note_has_unsaved_draft, supplement_connection_status)
 from ux_features import (source_page, contextual_query, conversation_context,
@@ -1422,6 +1426,118 @@ def main() -> None:
                 save_page_note(note_key, current_text)
                 st.rerun()
             render_note_feedback(note_key)
+
+        # On-demand visual analysis. Never send images to external services on upload.
+        st.divider()
+        st.markdown(help_heading(
+            "그림·표 자동 분석 (선택 사항)",
+            "① PDF 페이지에서 OCR 또는 표 추출을 실행하세요. "
+            "② 그래프·그림 의미 분석은 Gemini 키와 별도 전송 동의가 필요합니다. "
+            "③ 결과를 원본과 비교해 고치세요. "
+            "④ '검토한 내용 저장'을 눌러야 EXAONE 검색 자료에 반영됩니다.",
+        ), unsafe_allow_html=True)
+        st.caption("텍스트 OCR·표 추출은 Codespaces 내부에서 실행합니다. "
+                   "그래프·사진 분석만 별도 비전 AI에 선택한 PDF 페이지 이미지를 전송합니다.")
+        with st.expander("📍 시각자료 후보 페이지 확인", expanded=False):
+            try:
+                hints = page_visual_hints(doc)
+                st.dataframe(hints, hide_index=True, use_container_width=True)
+                st.caption("이미지·도형 수와 추출 글자 수로 표시한 점검 후보입니다. "
+                           "표·그래프 자동 판정이나 정확도 점수가 아닙니다.")
+            except VisualAnalysisError as exc:
+                st.warning(str(exc))
+
+        st.session_state.setdefault("visual_review_results", {})
+        review_key = f"visual_review_{note_key}"
+        available_ocr, available_languages = ocr_available_languages()
+        if available_ocr and "kor" in available_languages and "eng" in available_languages:
+            st.caption("✅ 한글·영어 로컬 OCR 사용 가능")
+        else:
+            st.info("OCR을 사용하려면 Codespaces에 Tesseract 한글·영어 언어팩을 설치해야 합니다. "
+                    "아래의 표 추출·Gemini 비전 분석은 별도로 사용할 수 있습니다.")
+
+        ocr_col, table_col, vision_col = st.columns(3)
+        with ocr_col:
+            run_ocr = st.button("🔤 OCR 글자 인식", key=f"auto_ocr_{note_key}",
+                                use_container_width=True)
+        with table_col:
+            run_table = st.button("▦ PDF 표 추출", key=f"auto_table_{note_key}",
+                                  use_container_width=True)
+        with vision_col:
+            st.caption("그래프·도식은 아래 비전 AI")
+        if run_ocr or run_table:
+            try:
+                with st.spinner("선택한 PDF 페이지 분석 중"):
+                    extracted = (extract_page_ocr(doc, page) if run_ocr
+                                 else extract_native_tables(doc, page))
+                if extracted.strip():
+                    label = "OCR" if run_ocr else "PDF 텍스트 표"
+                    st.session_state[review_key] = append_review_draft(
+                        st.session_state.get(review_key, ""), extracted, label
+                    )
+                    st.success(f"{label} 결과를 검토용 초안에 추가했습니다. 원본과 대조하세요.")
+                else:
+                    st.warning("읽을 수 있는 내용이 없습니다. 이미지형 표라면 비전 AI를 시도하세요.")
+            except VisualAnalysisError as exc:
+                st.warning(str(exc))
+
+        with st.expander("🧠 그래프·이미지 AI 분석 (외부 Gemini API)", expanded=False):
+            st.caption(f"분석 모델: {VISION_MODEL} · EXAONE과는 별도 API 키가 필요합니다. "
+                       "버튼을 누르면 선택한 PDF 페이지 이미지가 Google API로 전송되며 "
+                       "요금이 발생할 수 있습니다. 승인된 자료에만 사용하세요.")
+            vision_key = st.text_input(
+                "Gemini API 키", type="password",
+                value=os.environ.get("GEMINI_API_KEY", ""),
+                key="visual_gemini_api_key",
+                help="기본 EXAONE API 키와 별개입니다. 키를 GitHub에 올리지 마세요.",
+            )
+            allow_send = st.checkbox(
+                "선택한 PDF 페이지 이미지를 외부 Gemini API로 전송하는 데 동의합니다.",
+                key=f"vision_consent_{note_key}",
+            )
+            if st.button("🔍 이 페이지 이미지 AI 분석", type="primary",
+                         disabled=not (vision_key.strip() and allow_send),
+                         key=f"run_vision_{note_key}"):
+                try:
+                    with st.spinner("선택한 PDF 페이지 이미지 분석 중"):
+                        image_data = render_page_png(doc, page)
+                        analyzed = analyze_page_vision(
+                            image_data, vision_key,
+                            f"[{doc['name']} p.{page}]",
+                        )
+                    st.session_state[review_key] = append_review_draft(
+                        st.session_state.get(review_key, ""), analyzed, "비전 AI"
+                    )
+                    st.success("비전 분석 초안이 준비됐습니다. 숫자·축·범례를 원본에서 검토하세요.")
+                except VisualAnalysisError as exc:
+                    st.warning(str(exc))
+
+        suggested = st.session_state.get(review_key, "")
+        if suggested:
+            st.text_area(
+                "자동 분석 결과 검토 및 수정",
+                key=review_key, height=230,
+                help="AI·OCR이 잘못 읽은 숫자와 단위를 원본 PDF와 비교하여 수정하세요. "
+                     "이 상태에서는 EXAONE 검색 자료에 반영되지 않습니다.",
+            )
+            st.warning("자동 분석 결과는 아직 검색 자료에 반영되지 않았습니다. "
+                       "불명확한 수치를 수정하고 아래 저장 버튼을 눌러 승인하세요.")
+            if st.button("✅ 검토한 내용 저장 · EXAONE 검색 반영",
+                         type="primary", use_container_width=True,
+                         key=f"save_review_{note_key}"):
+                reviewed = st.session_state.get(review_key, "").strip()
+                if not reviewed:
+                    st.warning("저장할 분석 내용이 없습니다.")
+                else:
+                    merged = (saved_manual.strip() + "\n\n" + reviewed
+                              if saved_manual.strip() else reviewed)
+                    result = save_page_note(note_key, merged)
+                    if result.get("indexed"):
+                        st.session_state.pop(review_key, None)
+                        st.success("검토한 보강 내용을 이 PDF 페이지의 검색 자료에 저장했습니다.")
+                        st.rerun()
+                    else:
+                        st.error("검색 인덱스를 확인하지 못했습니다. 페이지를 다시 선택하세요.")
 
         # 3. 보강 파일 관리는 보조 영역에 배치하고 결과/오류를 분리합니다.
         st.divider()
