@@ -190,6 +190,56 @@ button, input, textarea, select {
   text-overflow:clip !important;
 }
 
+/* Stable page headings: prevent oversized Markdown h3 glyph/emoji clipping. */
+.exa-page-title {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:12px;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  height:auto !important;
+  min-height:48px;
+  padding:8px 0 10px;
+  margin:0 0 9px;
+  overflow:visible !important;
+  white-space:normal !important;
+  color:var(--exa-text);
+  line-height:1.5 !important;
+  box-sizing:border-box;
+}
+.exa-page-title-icon {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  font-size:23px;
+  line-height:1.5;
+  min-height:36px;
+  overflow:visible;
+}
+.exa-page-title-label {
+  display:block;
+  min-width:0;
+  max-width:100%;
+  font-size:26px;
+  font-weight:750;
+  letter-spacing:-.025em;
+  line-height:1.5 !important;
+  padding-top:2px;
+  padding-bottom:2px;
+  overflow:visible !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+}
+@media(max-width:680px) {
+  .exa-page-title {gap:9px;min-height:44px;padding:6px 0 8px;}
+  .exa-page-title-icon {font-size:21px;}
+  .exa-page-title-label {font-size:23px;line-height:1.55 !important;}
+}
+
 /* Sidebar: navigation is physically before upload and API controls. */
 [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
   background: var(--exa-surface) !important;
