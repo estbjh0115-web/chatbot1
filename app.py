@@ -31,6 +31,7 @@ import fitz  # PyMuPDF
 import requests
 import streamlit as st
 from design_theme import APP_CSS
+from ui_help import help_heading
 from supplement_ui import (clamp_page, coerce_page_number, note_page_label, note_draft_text,
                            note_has_unsaved_draft, supplement_connection_status)
 from ux_features import (source_page, contextual_query, conversation_context,
@@ -275,9 +276,19 @@ def build_chunks(docs: list[dict], manual_notes: dict, file_notes: dict | None =
             label = f"[{doc['name']} p.{number}]"
             for part in sliding_chunks(text):
                 chunks.append({"source": label, "text": part, "doc_id": doc["id"]})
-            note = page_note_text(doc, number, manual_notes, file_notes)
-            for part in sliding_chunks(note):
-                chunks.append({"source": label, "text": f"[해당 PDF 페이지의 보강 내용] {part}", "doc_id": doc["id"]})
+            note_key = f"{doc['id']}:{number}"
+            for note_kind, note_text in (
+                ("file", file_notes.get(note_key, "")),
+                ("manual", manual_notes.get(note_key, "")),
+            ):
+                for part in sliding_chunks(note_text):
+                    chunks.append({
+                        "source": label,
+                        "text": f"[해당 PDF 페이지의 보강 내용] {part}",
+                        "doc_id": doc["id"],
+                        "note_key": note_key,
+                        "note_kind": note_kind,
+                    })
     return chunks
 
 
@@ -321,11 +332,12 @@ def save_page_note(note_key: str, raw_text: str) -> dict:
         page_num = 0
     doc = next((x for x in st.session_state.docs if x["id"] == doc_id), None)
     source = f"[{doc['name']} p.{page_num}]" if doc else ""
-    prefix = content[:min(len(content), 28)]
-    indexed = bool(prefix) and any(
-        c["source"] == source and
-        c["text"].startswith("[해당 PDF 페이지의 보강 내용]") and
-        prefix in c["text"]
+    # Validate by exact page and note origin, not a fragile 28-character substring.
+    # Long imported notes and chunk boundaries no longer cause false warnings.
+    indexed = bool(content) and any(
+        c.get("note_key") == note_key
+        and c.get("note_kind") == "manual"
+        and c.get("source") == source
         for c in st.session_state.chunks
     )
     status = {"key": note_key, "chars": len(content), "indexed": indexed,
@@ -344,7 +356,7 @@ def render_note_feedback(note_key: str) -> None:
         elif status["indexed"]:
             st.success(f"✅ {status['source']} 수동 보강 {status['chars']:,}자 저장 · AI 검색 자료 반영 완료")
         else:
-            st.warning("입력값은 저장됐지만 검색 자료 반영 여부를 확인하지 못했습니다. 문서 파일과 페이지 번호를 확인해 주세요.")
+            st.warning("수동 보강이 세션에 저장됐지만 검색 인덱스에 등록되지 않았습니다. PDF를 다시 선택한 뒤 저장을 재시도하세요.")
     st.caption("수동 보강은 PDF 원본·'추출된 글자'를 수정하지 않습니다. AI 검색 자료에 별도로 추가됩니다.")
     saved = st.session_state.visual_notes.get(note_key, "").strip()
     if saved:
@@ -988,6 +1000,7 @@ def main() -> None:
         st.markdown("### 🔎 문서 내부 검색")
     elif active_page == PAGE_AUDIT:
         st.markdown("### 📊 문서 분석")
+        st.caption("문서의 글자 추출과 보강 상태를 확인하고, 표의 행을 선택해 원본 페이지를 열 수 있습니다.")
     elif active_page == PAGE_NOTES:
         st.markdown("### 🖼️ 그림·표 보강")
     elif active_page == PAGE_BULK:
@@ -1028,11 +1041,19 @@ def main() -> None:
             st.info("위 검색창에 문서에서 찾고 싶은 단어나 문장을 입력하세요.")
 
     if active_page == PAGE_AUDIT:
+        st.markdown(help_heading(
+            "문서 통계",
+            "PDF 수는 업로드한 문서 개수, 전체 페이지 수는 합계입니다. 원문 글자 수는 PDF에서 자동 추출한 글자이고 보강 글자 수는 직접 입력 또는 TXT/MD에서 연결한 글자입니다. 보강을 저장해도 원문 글자 수는 바뀌지 않습니다.",
+        ), unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
         col1.metric("PDF 수", f"{len(docs):,}개")
         col2.metric("전체 페이지 수", f"{total_pages:,}페이지")
         col3.metric("전체 글자 수", f"{total_chars:,}자")
         st.caption(f"원문 {raw_chars:,}자 + 보강 {bonus_chars:,}자. PDF 글자 수는 공백·줄바꿈을 포함하며, 보강 글자 수에는 .txt/.md 파일과 수동 입력 내용을 포함합니다.")
+        st.markdown(help_heading(
+            "파일별 분석",
+            "아래 항목을 열면 PDF별 페이지 수와 추출·보강 글자 수를 확인할 수 있습니다. 글자 추출 페이지 수가 적다면 이미지 또는 스캔 페이지가 있을 수 있습니다.",
+        ), unsafe_allow_html=True)
         with st.expander("파일별 PDF · 페이지 · 글자 수 보기"):
             rows = [
                 {"PDF 파일": d["name"], "페이지 수": len(d["pages"]),
@@ -1049,7 +1070,10 @@ def main() -> None:
 
         with st.expander("📊 문서 정밀 분석 · 페이지별 글자 수 / PDF 원본 미리보기", expanded=False):
             # 2단계: 업로드된 모든 PDF의 페이지별 글자 수를 계산하고, 짧은 페이지부터 표시합니다.
-            st.subheader("📊 페이지별 글자 수")
+            st.markdown(help_heading(
+                "페이지별 글자 수와 원본 미리보기",
+                "아래 표에서 원하는 행을 클릭하면 그 페이지의 원본 이미지와 수동 보강 입력칸이 나타납니다. 표의 '글자 수'는 자동 추출한 원문 글자 수이며 '보강 글자 수'와는 별도입니다.",
+            ), unsafe_allow_html=True)
             page_stats = build_page_statistics(docs, st.session_state.visual_notes, st.session_state.file_notes)
             low_text_rows = [row for row in page_stats if row["글자 수"] < LOW_TEXT_THRESHOLD]
             col_summary, col_filter = st.columns([1, 2], vertical_alignment="bottom")
@@ -1063,6 +1087,7 @@ def main() -> None:
                 )
             filtered_stats = low_text_rows if only_low_text else page_stats
             st.caption(
+                "표의 행을 클릭해 페이지를 선택할 수 있습니다. 물음표에 마우스를 올리면 사용법이 표시됩니다. "
                 "원문 추출 글자 수가 적은 순서로 정렬했습니다. "
                 "글자가 적다고 반드시 그림이 있는 것은 아니므로 PDF 페이지를 확인해 주세요. "
                 "보강 글자 수는 오른쪽 열에 별도로 표시됩니다."
@@ -1090,8 +1115,11 @@ def main() -> None:
                 selected_note_key = f"{selected_doc['id']}:{selected_page}"
 
                 with st.container(border=True):
-                    st.markdown("**🔎 선택한 PDF 페이지 원본 보기 · 그림/표 보강**")
-                    st.caption("표의 행을 클릭하면 해당 PDF 페이지가 아래에 표시됩니다.")
+                    st.markdown(help_heading(
+                        "선택한 PDF 페이지 · 수동 보강",
+                        "왼쪽 원본을 보고 오른쪽에 AI가 놓친 표·그래프 값과 단위를 적으세요. '보강 저장 · 검색 자료 반영'을 누르면 해당 PDF 페이지의 검색용 자료에 추가됩니다. 원본 PDF 파일과 추출된 글자는 수정되지 않습니다.",
+                    ), unsafe_allow_html=True)
+                    st.caption("표의 다른 행을 클릭하면 보강할 페이지가 변경됩니다.")
                     preview_col, note_col = st.columns([1.1, 1])
                     with preview_col:
                         st.markdown(f"**{selected_doc['name']} / {selected_page}페이지**")
@@ -1116,21 +1144,29 @@ def main() -> None:
                             f"원문 {selected_row['글자 수']:,}자 / "
                             f"보강 {selected_row['보강 글자 수']:,}자"
                         )
+                        st.markdown(help_heading(
+                            "PDF 원문 추출",
+                            "이 화면에는 PDF에서 자동으로 추출된 텍스트만 표시됩니다. 수동으로 저장한 보강 설명은 여기에 나타나지 않으며 아래의 보강 저장 상태와 AI 검색 자료에 따로 기록됩니다.",
+                        ), unsafe_allow_html=True)
                         with st.popover("추출된 글자 보기"):
                             st.text(selected_doc["pages"][selected_page - 1][:5000] or "추출된 글자가 없습니다.")
                         imported_note = st.session_state.file_notes.get(selected_note_key, "")
                         if imported_note:
                             with st.popover(f"보강 파일에서 연결된 내용 ({len(imported_note):,}자)"):
                                 st.text(imported_note[:7000])
-                        st.markdown("**그림·표에 빠진 내용 수동 보강**")
+                        st.markdown(help_heading(
+                            "그림·표에 빠진 내용 직접 입력",
+                            "예: '5페이지 막대그래프: A팀 32킬, B팀 21킬. 단위는 킬.'처럼 수치·비교 대상·단위를 정확히 입력하고 아래 저장 버튼을 누르세요. 저장 완료가 표시되면 AI 채팅에서 관련 질문으로 확인할 수 있습니다.",
+                        ), unsafe_allow_html=True)
                         with st.form(key=f"audit_note_form_{selected_note_key}"):
                             new_note = st.text_area(
                                 "그림·표의 핵심 내용, 수치, 단위, 범례 등을 직접 입력하세요.",
                                 value=st.session_state.visual_notes.get(selected_note_key, ""),
                                 height=165,
                                 key=f"audit_note_text_{selected_note_key}",
+                                help="선택한 PDF 페이지에 연결할 설명입니다. 예: '2024년 BLG와의 결승 3:2 승리'. 값을 입력한 후 반드시 '보강 저장' 버튼을 누르세요.",
                             )
-                            saved = st.form_submit_button("보강 저장 · 검색 자료 반영", type="primary")
+                            saved = st.form_submit_button("보강 저장 · 검색 자료 반영", type="primary", help="수동 설명을 저장하고 검색 인덱스를 갱신합니다. 원본 PDF 파일을 편집하지는 않습니다.")
                         if saved:
                             save_page_note(selected_note_key, new_note)
                             st.rerun()
@@ -1260,12 +1296,17 @@ def main() -> None:
             st.caption("기록은 현재 브라우저 세션에서만 보존됩니다. 종료 전에 다운로드하세요. 내보낸 파일에 질문·답변·근거 문구가 포함될 수 있습니다.")
 
     if active_page == PAGE_NOTES:
+        st.markdown(help_heading(
+            "그림·표 보강",
+            "① PDF와 페이지 선택 ② 왼쪽 PDF에서 표·그래프 확인 ③ 오른쪽에 놓친 내용 입력 ④ 보강 저장 버튼 누르기. 저장 완료 메시지가 뜨면 AI 채팅에서 질문해 보세요. 원본 PDF 자체는 변경되지 않습니다.",
+        ), unsafe_allow_html=True)
         st.caption("PDF 원본을 확인하면서 빠진 숫자·표·그래프 설명을 추가하세요. 보강은 원본 PDF를 수정하지 않습니다.")
 
         # 1. 작업할 문서와 페이지를 한곳에서 선택합니다.
         doc_index = st.selectbox(
             "작업할 PDF", range(len(docs)), format_func=lambda i: docs[i]["name"],
             key="supplement_doc_picker",
+            help="보강할 PDF를 선택하세요. 여러 PDF가 있다면 파일 이름을 확인한 뒤 선택합니다.",
         )
         doc = docs[doc_index]
         total = len(doc["pages"])
@@ -1294,6 +1335,7 @@ def main() -> None:
                 ),
                 key=page_widget_key,
                 on_change=switch_note_page, args=(page_widget_key, doc_id, total),
+                help="페이지마다 수동 보강 완료 또는 TXT/MD 연결 상태가 표시됩니다. 이전·다음 버튼으로도 이동할 수 있습니다.",
             )
             page = coerce_page_number(page, total)
         with next_col:
@@ -1322,7 +1364,10 @@ def main() -> None:
             with st.expander("PDF에서 자동 추출한 글자 보기"):
                 st.text(doc["pages"][page - 1][:4500] or "추출된 글자가 없습니다.")
         with editor_col:
-            st.markdown("**그림·표 설명 작성**")
+            st.markdown(help_heading(
+                "그림·표 설명 작성",
+                "PDF에서 자동 추출되지 않은 수치, 축, 범례, 표의 행·열, 단위를 설명하세요. 입력 후 저장을 눌러야 AI 검색 자료에 추가됩니다. 저장 전 페이지를 옮긴 내용은 초안으로 보관됩니다.",
+            ), unsafe_allow_html=True)
             st.caption("이미지에서 확인한 값·단위·범례를 적으면 AI 검색 자료에 추가됩니다.")
             if imported_note:
                 st.success(f"보강 파일 연결됨 · {len(imported_note):,}자")
@@ -1338,6 +1383,7 @@ def main() -> None:
                 )
             st.text_area(
                 "추가할 그림·표 설명", height=230, key=widget_key,
+                help="예: '3페이지 막대그래프에서 미드 18킬, 정글 12킬'. 반드시 숫자와 단위를 원본과 대조하세요.",
                 on_change=stash_note_draft, args=(note_key, widget_key),
                 placeholder="예: 2024년 팀 A의 킬 수는 18, 팀 B는 12입니다. 단위는 킬입니다.",
             )
@@ -1363,7 +1409,10 @@ def main() -> None:
         linked_sections, linked_pages, warning_count = supplement_connection_status(
             report, has_upload
         )
-        st.markdown("**TXT·MD 보강 파일 (선택 사항)**")
+        st.markdown(help_heading(
+            "TXT·MD 보강 파일 (선택 사항)",
+            "PDF 페이지마다 설명이 이미 담긴 TXT/MD 파일을 한 번에 연결합니다. 문서 안의 [실제 PDF 파일명 p.페이지]가 업로드한 PDF와 일치해야 합니다. 연결 실패 건은 아래 목록에서 확인하세요. 직접 보강만 한다면 파일 업로드는 필요 없습니다.",
+        ), unsafe_allow_html=True)
         if has_upload:
             st.success(f"연결된 보강: {linked_sections}구간 · {linked_pages}페이지")
             if warning_count:
