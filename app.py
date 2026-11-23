@@ -691,34 +691,260 @@ def init_state() -> None:
             st.session_state[key] = default
 
 
-def main() -> None:
-    st.set_page_config(page_title="PDF 질의응답 챗봇 · EXAONE", page_icon="📄", layout="wide")
-    st.markdown("""
-    <style>
-    .block-container {max-width: 1180px; padding-top: 1.65rem;}
-    [data-testid="stSidebar"] {background-color: #F7F5F1;}
-    div.stButton > button[kind="primary"] {background-color: #F97316; border-color: #F97316;}
-    </style>
-    """, unsafe_allow_html=True)
-    init_state()
 
-    st.title("📄 PDF 질의응답 챗봇")
-    st.caption("K-EXAONE 2.5 · PyMuPDF · 페이지별 글자 수 · .txt/.md 보강 · CSV 일괄 질문 · 출처 표시 · 오류 진단")
+# 앱 메인 영역은 다크 컬러, 사이드바는 명확한 라이트 컬러로 고정합니다.
+# Streamlit 메뉴의 테마 변경/브라우저 다크 모드에도 글자가 흰색으로 사라지지 않도록
+# 사이드바의 텍스트/위젯/업로드 버튼 색상까지 명시적으로 지정합니다.
+UI_CSS = r"""
+<style>
+:root { color-scheme: dark; }
+[data-testid="stAppViewContainer"] {
+  background: radial-gradient(ellipse at 85% 0%, rgba(104,74,205,.17), transparent 42%),
+              linear-gradient(145deg, #101528 0%, #101326 55%, #15172e 100%) !important;
+}
+[data-testid="stHeader"] { background: transparent !important; }
+[data-testid="stAppViewContainer"] .main .block-container,
+[data-testid="stMainBlockContainer"] {
+  max-width: 1330px !important;
+  padding-top: 2rem !important;
+  padding-bottom: 5.5rem !important;
+  padding-left: clamp(1.2rem, 3.4vw, 3.4rem) !important;
+  padding-right: clamp(1.2rem, 3.4vw, 3.4rem) !important;
+}
+/* 큰 화면에서 말줄임/줄바꿈이 어색하지 않게 */
+[data-testid="stMain"] h1 {font-size:clamp(2rem,3vw,2.8rem); font-weight:800; letter-spacing:-.045em;}
+[data-testid="stMain"] h2,[data-testid="stMain"] h3 { letter-spacing:-.025em; }
+[data-testid="stMain"] p,[data-testid="stMain"] label { line-height:1.65; }
+[data-testid="stMain"] [data-testid="stMetric"] {
+  background:rgba(31,36,60,.83); border:1px solid #313856;
+  border-radius:16px; padding:17px 22px; min-height:110px;
+}
+[data-testid="stMain"] [data-testid="stMetricLabel"] {color:#bbc5df!important;}
+[data-testid="stMain"] [data-testid="stMetricValue"] {color:#f6f7ff!important;}
+[data-testid="stMain"] [data-testid="stExpander"] {
+  border:1px solid #333b59; border-radius:14px;
+}
+[data-testid="stMain"] [data-testid="stTabs"] [role="tablist"] {gap:10px;}
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"] {
+  color:#cbd3ef!important; border-radius:10px 10px 0 0;
+  padding-left:16px; padding-right:16px;
+}
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {color:#e3d5ff!important;}
+[data-testid="stMain"] .stButton>button[kind="primary"],
+[data-testid="stMain"] button[data-testid="stBaseButton-primary"] {
+  background:#6645df!important; border:1px solid #6645df!important;
+  color:white!important; font-weight:700;
+}
+[data-testid="stMain"] .stButton>button[kind="primary"] *,
+[data-testid="stMain"] button[data-testid="stBaseButton-primary"] * {color:white!important;}
+
+/* 사이드바: 색상 충돌 원인 제거. 배경색과 글자색을 함께 고정 */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div,
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+  background:#F7F8FE!important; color:#1A2340!important;
+  --text-color:#1A2340;
+  --background-color:#F7F8FE;
+  --secondary-background-color:#EEF0FA;
+  --primary-color:#6545DE;
+  --border-color:#D5DAEF;
+}
+[data-testid="stSidebar"] {border-right:1px solid #d8dded; width:365px!important;}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] :is(p,span,li,strong,em,code,pre,h1,h2,h3,h4,h5),
+[data-testid="stSidebar"] :is(label,h1,h2,h3,h4,h5),
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] *,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {
+  color:#1B2540!important; opacity:1!important;
+}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] *,
+[data-testid="stSidebar"] small {color:#52607E!important;}
+[data-testid="stSidebar"] h3 {font-size:1.03rem!important; font-weight:800!important; margin-top:16px!important;}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {line-height:1.48!important;}
+[data-testid="stSidebar"] [data-testid="stTextInput"] input {
+  color:#1A2340!important; background:#fff!important;
+  caret-color:#6142d4!important;
+}
+[data-testid="stSidebar"] [data-testid="stTextInput"] input::placeholder {color:#697493!important;opacity:1;}
+[data-testid="stSidebar"] [data-baseweb="input"],
+[data-testid="stSidebar"] [data-baseweb="base-input"] {
+  color:#1A2340!important; background:#fff!important;
+  border-color:#cbd2e6!important; border-radius:9px!important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] section,
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+  background:#EDEDFC!important; border:1.5px dashed #A8ACEB!important;
+  border-radius:12px!important; color:#253357!important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] section *,
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {color:#27375B!important;}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] button,
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+  background:#fff!important; color:#35236c!important;
+  border:1px solid #b6b9dd!important; font-weight:700!important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] button *,
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button * {color:#35236c!important;}
+[data-testid="stSidebar"] .stButton>button,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] {
+  background:#fff!important; color:#263153!important;
+  border:1px solid #c8cfe8!important; font-weight:650!important;
+  min-height:42px; border-radius:9px!important;
+}
+[data-testid="stSidebar"] .stButton>button *,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-secondary"] * {color:#263153!important;}
+[data-testid="stSidebar"] .stButton>button[kind="primary"],
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] {
+  background:#6342dd!important; color:#fff!important;
+  border-color:#6342dd!important; opacity:1!important;
+}
+[data-testid="stSidebar"] .stButton>button[kind="primary"] *,
+[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"] * {color:#fff!important;}
+[data-testid="stSidebar"] button:disabled {opacity:.56!important;cursor:not-allowed;}
+[data-testid="stSidebar"] [data-baseweb="slider"] *,
+[data-testid="stSidebar"] [data-testid="stSlider"] * {color:#334260!important;}
+[data-testid="stSidebar"] [data-testid="stSlider"] [role="slider"] {background:#6f4ee9!important;}
+[data-testid="stSidebar"] [data-testid="stAlert"] {background:#e9ecf9!important;border:1px solid #cbd2ef!important;}
+[data-testid="stSidebar"] [data-testid="stAlert"] * {color:#25355c!important;}
+[data-testid="stSidebar"] [data-testid="stExpander"] {background:#F0F1FA!important;border-color:#d3d9ed!important;}
+[data-testid="stSidebar"] [data-testid="stExpander"] * {color:#273457!important;}
+[data-testid="stSidebar"] [data-testid="stCodeBlock"] pre,
+[data-testid="stSidebar"] [data-testid="stCodeBlock"] code {
+  background:#ffffff!important;color:#1d2b4a!important;
+}
+[data-testid="stSidebar"] [data-testid="stCodeBlock"] * {color:#1d2b4a!important;}
+[data-testid="stSidebar"] [data-testid="stNotification"] * {color:#1d2b4a!important;}
+[data-testid="stSidebar"] hr {border-color:#d8dded!important;}
+[data-testid="stSidebarCollapseButton"] button {color:#1d2744!important;}
+.sidebar-logo {
+  background:linear-gradient(130deg,#efe9ff,#f6f7ff);
+  border:1px solid #d9d0f6; border-radius:14px;
+  padding:13px 15px; margin-bottom:20px;
+  display:flex; align-items:center; gap:11px;
+}
+.sidebar-logo .symbol {display:inline-grid;place-items:center;font-size:22px;
+  width:39px;height:39px;background:#6744dc;color:white!important;border-radius:10px;}
+.sidebar-logo strong {font-size:17px;color:#211b45!important;letter-spacing:-.03em;}
+.side-mini {font-size:12px;color:#6d7593!important;margin-top:3px;}
+.side-model {display:flex; gap:7px; margin:8px 0 17px; flex-wrap:wrap;}
+.side-pill {display:inline-flex; align-items:center; padding:6px 10px;
+  border-radius:999px; background:#ece5ff; color:#5233c5!important;
+  font-weight:750;font-size:12px;border:1px solid #ded5ff;}
+
+/* 메인 대시보드 */
+.page-header {display:flex;align-items:center;gap:18px;margin:6px 0 25px;}
+.page-header .page-icon {font-size:32px;display:grid;place-items:center;
+  width:66px;height:66px;border-radius:17px;
+  background:linear-gradient(155deg,#ede4ff,#a487ff);box-shadow:0 12px 28px rgba(71,46,154,.28);}
+.page-header .eyebrow {font-weight:750;color:#ac96fa;font-size:12px;
+  letter-spacing:.1em;line-height:1.1;}
+.page-header .heading {font-size:clamp(27px,3vw,42px);line-height:1.16;
+  font-weight:840;color:#f5f6ff;letter-spacing:-.045em;margin:5px 0 8px;}
+.page-header .subtitle {font-size:13px;color:#aeb9d1;line-height:1.65;}
+.welcome-hero {border-radius:20px;border:1px solid #6651a8;
+  background:linear-gradient(115deg,#30234f 0%,#282a61 58%,#282452 100%);
+  padding:26px 33px;display:flex;align-items:center;gap:26px;min-height:174px;
+  box-shadow:0 14px 38px rgba(0,0,0,.16);margin:8px 0 24px;}
+.welcome-hero .hero-icon {font-size:49px;line-height:1;flex:0 0 100px;text-align:center;
+  border-right:1px solid #6b58aa;padding-right:23px;}
+.welcome-hero .hero-title {color:#fff;font-size:clamp(20px,2.1vw,28px);
+  font-weight:800;letter-spacing:-.035em;line-height:1.4;margin-bottom:9px;}
+.welcome-hero .hero-desc {color:#d4d4f0;font-size:14px;line-height:1.65;}
+.welcome-hero.ready {min-height:115px;padding:20px 28px;margin-bottom:19px;}
+.welcome-hero.ready .hero-icon {font-size:32px;flex-basis:70px;padding-right:18px;}
+.welcome-hero.ready .hero-title {font-size:21px;}
+.dashboard-card {min-height:196px;border-radius:17px;padding:22px;
+  border:1px solid #353955;background:#1c2037; margin-bottom:14px;}
+.dashboard-card .card-heading {font-size:17px;color:#f4f5ff;font-weight:780;
+  margin-bottom:20px;line-height:1.4;}
+.dashboard-card .card-empty {min-height:116px;border:1px dashed #40465f;
+  border-radius:12px; display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:7px;text-align:center;padding:14px;}
+.dashboard-card .card-empty .big {font-size:27px;opacity:.8;}
+.dashboard-card .card-empty .empty-line {font-size:13px;color:#c8cde3;}
+.dashboard-card .card-empty .empty-small {font-size:12px;color:#8d99ba;}
+.dashboard-card .sample {padding:10px 12px;margin:7px 0;background:#2a2f49;
+  border-radius:9px;color:#e2e6fa;font-size:13px;line-height:1.5;}
+.dashboard-footnote {color:#a9b4d0;font-size:13px;margin:0 0 14px;}
+[data-testid="stChatInput"] textarea {font-size:15px!important;}
+@media (max-width:980px) {
+  [data-testid="stSidebar"] {width:min(90vw,365px)!important;}
+  [data-testid="stMainBlockContainer"] {padding-left:1rem!important;padding-right:1rem!important;}
+  .welcome-hero {padding:20px;gap:15px;}
+  .welcome-hero .hero-icon {flex-basis:65px;font-size:32px;padding-right:12px;}
+}
+@media (max-width:680px) {
+  .page-header .page-icon {width:50px;height:50px;font-size:24px;}
+  .page-header .heading {font-size:25px;}
+  .welcome-hero .hero-title {font-size:18px;}
+  .welcome-hero .hero-desc {font-size:12px;}
+}
+</style>
+"""
+
+
+def render_header() -> None:
+    st.markdown("""
+    <div class="page-header">
+      <div class="page-icon">📄</div>
+      <div>
+        <div class="eyebrow">EXAONE · DOCUMENT INTELLIGENCE</div>
+        <div class="heading">PDF 질의응답 챗봇</div>
+        <div class="subtitle">K-EXAONE 2.5 · PDF 분석 · 페이지 출처 확인 · 그림·표 보강 · CSV 일괄 질문 · 퀴즈</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_welcome() -> None:
+    st.markdown("""
+    <div class="welcome-hero">
+      <div class="hero-icon">📑</div>
+      <div>
+        <div class="hero-title">문서를 업로드하고, 필요한 답을 찾아보세요.</div>
+        <div class="hero-desc">왼쪽에서 EXAONE API 키와 PDF 파일을 등록하면 질문을 시작할 수 있습니다.<br>
+        답변과 함께 실제 검색된 PDF 페이지를 표시합니다.</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    columns = st.columns(3, gap="medium")
+    with columns[0]:
+        st.markdown("""<div class="dashboard-card"><div class="card-heading">📄 업로드된 문서</div>
+        <div class="card-empty"><span class="big">📂</span><span class="empty-line">아직 업로드된 PDF가 없습니다.</span>
+        <span class="empty-small">왼쪽에서 PDF를 선택하세요.</span></div></div>""", unsafe_allow_html=True)
+    with columns[1]:
+        st.markdown("""<div class="dashboard-card"><div class="card-heading">💬 질문 예시</div>
+        <div class="sample">이 문서의 핵심 내용을 요약해줘.</div>
+        <div class="sample">특정 개념을 쉽게 설명해줘.</div>
+        <div class="sample">이 내용의 근거 페이지를 알려줘.</div></div>""", unsafe_allow_html=True)
+    with columns[2]:
+        st.markdown("""<div class="dashboard-card"><div class="card-heading">🕘 최근 작업</div>
+        <div class="card-empty"><span class="big">◷</span><span class="empty-line">아직 질문 내역이 없습니다.</span>
+        <span class="empty-small">업로드 후 질문하면 대화가 표시됩니다.</span></div></div>""", unsafe_allow_html=True)
+    st.caption("먼저 PDF를 올리면 답변, 검색 출처, 페이지별 글자 수 분석 기능이 활성화됩니다.")
+    st.chat_input("PDF 파일을 업로드한 후 질문할 수 있습니다.", disabled=True, key="empty_docs_chat")
+
+def main() -> None:
+    st.set_page_config(page_title="PDF 질의응답 챗봇 · EXAONE", page_icon="📄", layout="wide", initial_sidebar_state="expanded")
+    st.markdown(UI_CSS, unsafe_allow_html=True)
+    init_state()
+    render_header()
 
     with st.sidebar:
-        st.header("EXAONE API 키")
+        st.markdown("""<div class="sidebar-logo"><span class="symbol">📄</span><div><strong>EXAONE PDF 챗봇</strong>
+        <div class="side-mini">PDF 문서 기반 AI 질의응답</div></div></div>""", unsafe_allow_html=True)
+        st.markdown("### 🔑 EXAONE API 키")
         api_key = st.text_input(
             "API 키 입력", type="password", value=os.environ.get("EXAONE_API_KEY", ""), placeholder="EXAONE API 키를 입력하세요",
             help="API 키를 GitHub 코드나 채팅창에 붙여 넣지 마세요. 앱 실행 화면에서만 입력하세요."
         )
-        st.caption(f"모델: `{MODEL}`  |  추론 강도: `{REASONING_EFFORT}`")
+        st.markdown(f'<div class="side-model"><span class="side-pill">◈ {MODEL}</span><span class="side-pill">⚡ {REASONING_EFFORT}</span></div>', unsafe_allow_html=True)
         st.slider(
             "답변 최대 토큰 수 (추론 포함)",
             min_value=1024, max_value=16384, step=1024,
             key="answer_token_limit",
             help="답이 비거나 길이 제한 오류가 나면 올려 주세요. 높일수록 사용량이 늘어날 수 있습니다.",
         )
-        if st.button("API 연결 테스트", disabled=not bool(api_key), use_container_width=True):
+        if st.button("API 연결 테스트", type="primary", disabled=not bool(api_key), use_container_width=True):
             try:
                 with st.spinner("EXAONE 연결 확인 중 (API 호출 1회)"):
                     reply = connection_test(api_key)
@@ -731,12 +957,12 @@ def main() -> None:
                 st.error(str(exc))
                 st.info(error_help(exc))
         st.caption("연결 테스트는 PDF 내용을 보내지 않지만 API 사용량이 발생할 수 있습니다.")
-        st.header("PDF 문서 업로드")
+        st.markdown("### 📁 PDF 문서 업로드")
         uploaded = st.file_uploader(
             "PDF 여러 개 업로드", type=["pdf"], accept_multiple_files=True,
             help=f"파일당 최대 {MAX_PDF_SIZE_MB}MB, {MAX_PAGES_PER_FILE}페이지"
         )
-        st.subheader("3단계 · 보강 파일")
+        st.markdown("### 📎 3단계 · 보강 파일")
         uploaded_supplements = st.file_uploader(
             "보강 파일 업로드 (.txt / .md)",
             type=["txt", "md"], accept_multiple_files=True,
@@ -746,7 +972,7 @@ def main() -> None:
         with st.expander("보강 파일 작성 예시"):
             st.code("[학습자료.pdf p.2]\n그림 1은 A와 B를 비교하며 A는 35%, B는 65%이다.\n\n[학습자료.pdf p.5]\n표 2의 합계는 120건이다.", language="text")
             st.caption("학습자료.pdf는 실제 업로드하는 PDF 파일명으로 변경하세요. 표시는 줄 전체에 단독으로 적습니다.")
-        st.subheader("4단계 · 일괄 질문 CSV")
+        st.markdown("### 📋 4단계 · 일괄 질문 CSV")
         uploaded_question_csv = st.file_uploader(
             "질문 CSV 업로드", type=["csv"], accept_multiple_files=False,
             help="첫 줄에 id,질문 열이 있는 UTF-8 또는 UTF-8-SIG CSV 파일을 올려 주세요.",
@@ -797,8 +1023,13 @@ def main() -> None:
 
     docs = st.session_state.docs
     if not docs:
-        st.info("왼쪽에서 PDF 파일과 EXAONE API 키를 등록하면 시작할 수 있습니다.")
+        render_welcome()
         st.stop()
+    st.markdown("""
+    <div class="welcome-hero ready"><div class="hero-icon">✅</div>
+    <div><div class="hero-title">문서 분석이 준비됐습니다.</div>
+    <div class="hero-desc">질문 탭에서 내용을 물어보세요. 상세 페이지 분석은 아래의 접힌 영역에서 열 수 있습니다.</div>
+    </div></div>""", unsafe_allow_html=True)
 
     supplement_uploads = [(f.name, f.getvalue()) for f in (uploaded_supplements or [])]
     supplement_signature = "|".join(
@@ -878,107 +1109,120 @@ def main() -> None:
     if not st.session_state.chunks:
         st.warning("검색 가능한 텍스트가 없습니다. 보강 파일을 업로드하거나 그림·표 수동 보강 탭에서 페이지 내용을 입력해 주세요.")
 
-    # 2단계: 업로드된 모든 PDF의 페이지별 글자 수를 계산하고, 짧은 페이지부터 표시합니다.
-    st.subheader("📊 페이지별 글자 수")
-    page_stats = build_page_statistics(docs, st.session_state.visual_notes, st.session_state.file_notes)
-    low_text_rows = [row for row in page_stats if row["글자 수"] < LOW_TEXT_THRESHOLD]
-    col_summary, col_filter = st.columns([1, 2], vertical_alignment="bottom")
-    with col_summary:
-        st.metric(f"{LOW_TEXT_THRESHOLD}자 미만 페이지 수", f"{len(low_text_rows):,}개")
-    with col_filter:
-        only_low_text = st.checkbox(
-            f"{LOW_TEXT_THRESHOLD}자 미만 페이지만 보기",
-            value=bool(low_text_rows),
-            help="표의 '글자 수'는 PDF 원문에서 추출한 값이며, 보강 글자 수는 별도로 계산합니다.",
+    with st.expander("📊 문서 정밀 분석 · 페이지별 글자 수 / PDF 원본 미리보기", expanded=False):
+        # 2단계: 업로드된 모든 PDF의 페이지별 글자 수를 계산하고, 짧은 페이지부터 표시합니다.
+        st.subheader("📊 페이지별 글자 수")
+        page_stats = build_page_statistics(docs, st.session_state.visual_notes, st.session_state.file_notes)
+        low_text_rows = [row for row in page_stats if row["글자 수"] < LOW_TEXT_THRESHOLD]
+        col_summary, col_filter = st.columns([1, 2], vertical_alignment="bottom")
+        with col_summary:
+            st.metric(f"{LOW_TEXT_THRESHOLD}자 미만 페이지 수", f"{len(low_text_rows):,}개")
+        with col_filter:
+            only_low_text = st.checkbox(
+                f"{LOW_TEXT_THRESHOLD}자 미만 페이지만 보기",
+                value=bool(low_text_rows),
+                help="표의 '글자 수'는 PDF 원문에서 추출한 값이며, 보강 글자 수는 별도로 계산합니다.",
+            )
+        filtered_stats = low_text_rows if only_low_text else page_stats
+        st.caption(
+            "원문 추출 글자 수가 적은 순서로 정렬했습니다. "
+            "글자가 적다고 반드시 그림이 있는 것은 아니므로 PDF 페이지를 확인해 주세요. "
+            "보강 글자 수는 오른쪽 열에 별도로 표시됩니다."
         )
-    filtered_stats = low_text_rows if only_low_text else page_stats
-    st.caption(
-        "원문 추출 글자 수가 적은 순서로 정렬했습니다. "
-        "글자가 적다고 반드시 그림이 있는 것은 아니므로 PDF 페이지를 확인해 주세요. "
-        "보강 글자 수는 오른쪽 열에 별도로 표시됩니다."
-    )
-    if filtered_stats:
-        display_rows = [
-            {column: row[column] for column in ("파일", "페이지", "글자 수", "보강 글자 수")}
-            for row in filtered_stats
-        ]
-        table_state = st.dataframe(
-            display_rows,
-            hide_index=True,
-            use_container_width=True,
-            height=min(340, max(110, (len(display_rows) + 1) * 36)),
-            on_select="rerun",
-            selection_mode="single-row",
-            key=f"page_table_{hashlib.sha256(signature.encode()).hexdigest()[:12]}_{int(only_low_text)}",
-        )
-        selected_rows = table_state.selection.rows
-        selected_index = selected_rows[0] if selected_rows else 0
-        selected_index = min(selected_index, len(filtered_stats) - 1)
-        selected_row = filtered_stats[selected_index]
-        selected_doc = docs[selected_row["_doc_index"]]
-        selected_page = selected_row["페이지"]
-        selected_note_key = f"{selected_doc['id']}:{selected_page}"
+        if filtered_stats:
+            display_rows = [
+                {column: row[column] for column in ("파일", "페이지", "글자 수", "보강 글자 수")}
+                for row in filtered_stats
+            ]
+            table_state = st.dataframe(
+                display_rows,
+                hide_index=True,
+                use_container_width=True,
+                height=min(340, max(110, (len(display_rows) + 1) * 36)),
+                on_select="rerun",
+                selection_mode="single-row",
+                key=f"page_table_{hashlib.sha256(signature.encode()).hexdigest()[:12]}_{int(only_low_text)}",
+            )
+            selected_rows = table_state.selection.rows
+            selected_index = selected_rows[0] if selected_rows else 0
+            selected_index = min(selected_index, len(filtered_stats) - 1)
+            selected_row = filtered_stats[selected_index]
+            selected_doc = docs[selected_row["_doc_index"]]
+            selected_page = selected_row["페이지"]
+            selected_note_key = f"{selected_doc['id']}:{selected_page}"
 
-        with st.expander("🔎 선택한 PDF 페이지 원본 보기 · 그림/표 보강", expanded=True):
-            st.caption("표의 행을 클릭하면 해당 PDF 페이지가 아래에 표시됩니다.")
-            preview_col, note_col = st.columns([1.1, 1])
-            with preview_col:
-                st.markdown(f"**{selected_doc['name']} / {selected_page}페이지**")
-                try:
-                    st.image(
-                        page_png(selected_doc, selected_page),
-                        caption=f"원본 PDF {selected_page}페이지 이미지 미리보기",
-                        use_container_width=True,
+            with st.container(border=True):
+                st.markdown("**🔎 선택한 PDF 페이지 원본 보기 · 그림/표 보강**")
+                st.caption("표의 행을 클릭하면 해당 PDF 페이지가 아래에 표시됩니다.")
+                preview_col, note_col = st.columns([1.1, 1])
+                with preview_col:
+                    st.markdown(f"**{selected_doc['name']} / {selected_page}페이지**")
+                    try:
+                        st.image(
+                            page_png(selected_doc, selected_page),
+                            caption=f"원본 PDF {selected_page}페이지 이미지 미리보기",
+                            use_container_width=True,
+                        )
+                    except Exception:
+                        st.error("페이지 미리보기를 생성하지 못했습니다. 원본 PDF를 내려받아 확인해 주세요.")
+                    st.download_button(
+                        "원본 PDF 내려받아 뷰어에서 열기",
+                        data=selected_doc["bytes"],
+                        file_name=selected_doc["name"],
+                        mime="application/pdf",
+                        key=f"audit_download_{selected_doc['id']}",
                     )
-                except Exception:
-                    st.error("페이지 미리보기를 생성하지 못했습니다. 원본 PDF를 내려받아 확인해 주세요.")
-                st.download_button(
-                    "원본 PDF 내려받아 뷰어에서 열기",
-                    data=selected_doc["bytes"],
-                    file_name=selected_doc["name"],
-                    mime="application/pdf",
-                    key=f"audit_download_{selected_doc['id']}",
-                )
-            with note_col:
-                st.markdown("**이 페이지의 텍스트 추출 결과**")
-                st.caption(
-                    f"원문 {selected_row['글자 수']:,}자 / "
-                    f"보강 {selected_row['보강 글자 수']:,}자"
-                )
-                with st.expander("추출된 글자 보기"):
-                    st.text(selected_doc["pages"][selected_page - 1][:5000] or "추출된 글자가 없습니다.")
-                imported_note = st.session_state.file_notes.get(selected_note_key, "")
-                if imported_note:
-                    with st.expander(f"보강 파일에서 연결된 내용 ({len(imported_note):,}자)"):
-                        st.text(imported_note[:7000])
-                st.markdown("**그림·표에 빠진 내용 수동 보강**")
-                with st.form(key=f"audit_note_form_{selected_note_key}"):
-                    new_note = st.text_area(
-                        "그림·표의 핵심 내용, 수치, 단위, 범례 등을 직접 입력하세요.",
-                        value=st.session_state.visual_notes.get(selected_note_key, ""),
-                        height=165,
-                        key=f"audit_note_text_{selected_note_key}",
+                with note_col:
+                    st.markdown("**이 페이지의 텍스트 추출 결과**")
+                    st.caption(
+                        f"원문 {selected_row['글자 수']:,}자 / "
+                        f"보강 {selected_row['보강 글자 수']:,}자"
                     )
-                    saved = st.form_submit_button("보강 저장 · 검색 자료 반영", type="primary")
-                if saved:
-                    st.session_state.visual_notes[selected_note_key] = new_note
-                    st.session_state.csv_results = []
-                    st.session_state.csv_errors = []
-                    st.session_state.csv_finished = False
-                    st.session_state.bulk_results = []
-                    st.session_state.messages = []
-                    st.session_state.quiz = []
-                    set_index()
-                    st.rerun()
-    else:
-        st.success(f"{LOW_TEXT_THRESHOLD}자 미만 페이지가 없습니다. 체크를 해제하면 전체 페이지를 볼 수 있습니다.")
+                    with st.popover("추출된 글자 보기"):
+                        st.text(selected_doc["pages"][selected_page - 1][:5000] or "추출된 글자가 없습니다.")
+                    imported_note = st.session_state.file_notes.get(selected_note_key, "")
+                    if imported_note:
+                        with st.popover(f"보강 파일에서 연결된 내용 ({len(imported_note):,}자)"):
+                            st.text(imported_note[:7000])
+                    st.markdown("**그림·표에 빠진 내용 수동 보강**")
+                    with st.form(key=f"audit_note_form_{selected_note_key}"):
+                        new_note = st.text_area(
+                            "그림·표의 핵심 내용, 수치, 단위, 범례 등을 직접 입력하세요.",
+                            value=st.session_state.visual_notes.get(selected_note_key, ""),
+                            height=165,
+                            key=f"audit_note_text_{selected_note_key}",
+                        )
+                        saved = st.form_submit_button("보강 저장 · 검색 자료 반영", type="primary")
+                    if saved:
+                        st.session_state.visual_notes[selected_note_key] = new_note
+                        st.session_state.csv_results = []
+                        st.session_state.csv_errors = []
+                        st.session_state.csv_finished = False
+                        st.session_state.bulk_results = []
+                        st.session_state.messages = []
+                        st.session_state.quiz = []
+                        set_index()
+                        st.rerun()
+        else:
+            st.success(f"{LOW_TEXT_THRESHOLD}자 미만 페이지가 없습니다. 체크를 해제하면 전체 페이지를 볼 수 있습니다.")
 
     tab_chat, tab_notes, tab_quiz, tab_bulk = st.tabs([
         "💬 PDF 질의응답", "🖼️ 그림·표 수동 보강", "📝 퀴즈·자동 채점", "📋 여러 문제 일괄 답변"
     ])
 
     with tab_chat:
-        st.subheader("문서 내용 질문하기")
+        st.subheader("💬 문서 내용 질문하기")
+        st.caption("PDF 내용에서 근거를 찾아 답변합니다. 아래 질문 예시를 눌러 바로 질문할 수도 있습니다.")
+        examples = [
+            "이 문서의 핵심 내용을 요약해줘.",
+            "주요 수치와 조건을 정리해줘.",
+            "문서에서 강조한 결론과 근거 페이지는?",
+        ]
+        suggested_question = None
+        for idx, (column, example) in enumerate(zip(st.columns(3), examples)):
+            with column:
+                if st.button(example, key=f"example_question_{idx}", use_container_width=True):
+                    suggested_question = example
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
@@ -987,7 +1231,7 @@ def main() -> None:
                         for source in message["evidence"]:
                             st.caption(source["source"])
                             st.text(source["text"][:650])
-        question = st.chat_input("질문을 입력하세요. 예: 자료에서 정의한 주요 목표는 무엇인가요?")
+        question = st.chat_input("PDF 문서에 대해 궁금한 내용을 입력하세요.") or suggested_question
         if question:
             st.session_state.messages.append({"role": "user", "content": question})
             if not api_key:
