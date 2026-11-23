@@ -829,6 +829,21 @@ def init_state() -> None:
 # Streamlit 메뉴의 테마 변경/브라우저 다크 모드에도 글자가 흰색으로 사라지지 않도록
 # 사이드바의 텍스트/위젯/업로드 버튼 색상까지 명시적으로 지정합니다.
 
+
+def render_page_title(icon: str, title: str) -> None:
+    """Render a non-clipping page heading independent of Streamlit Markdown h3."""
+    from html import escape
+    safe_icon = escape(icon, quote=True)
+    safe_title = escape(title, quote=True)
+    st.markdown(
+        '<div class="exa-page-title" role="heading" aria-level="1">'
+        f'<span class="exa-page-title-icon" aria-hidden="true">{safe_icon}</span>'
+        f'<span class="exa-page-title-label">{safe_title}</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_header() -> None:
     st.markdown("""
     <div class="page-header">
@@ -994,21 +1009,21 @@ def main() -> None:
     total_chars = raw_chars + bonus_chars
     readable_pages = sum(bool(page.strip()) for doc in docs for page in doc["pages"])
     if active_page == PAGE_CHAT:
-        st.markdown("### 💬 AI 채팅")
+        render_page_title("💬", "AI 채팅")
         st.caption(f"문서 {len(docs)}개 · {total_pages:,}페이지 준비 완료 | 답변 아래 출처를 누르면 PDF 페이지를 확인할 수 있습니다.")
     elif active_page == PAGE_SEARCH:
-        st.markdown("### 🔎 문서 내부 검색")
+        render_page_title("🔎", "문서 내부 검색")
     elif active_page == PAGE_AUDIT:
-        st.markdown("### 📊 문서 분석")
+        render_page_title("📊", "문서 분석")
         st.caption("문서의 글자 추출과 보강 상태를 확인하고, 표의 행을 선택해 원본 페이지를 열 수 있습니다.")
     elif active_page == PAGE_NOTES:
-        st.markdown("### 🖼️ 그림·표 보강")
+        render_page_title("🖼️", "그림·표 보강")
     elif active_page == PAGE_BULK:
-        st.markdown("### 📋 일괄 질문")
+        render_page_title("📋", "일괄 질문")
     elif active_page == PAGE_QUIZ:
-        st.markdown("### 📝 퀴즈")
+        render_page_title("📝", "퀴즈")
     elif active_page == PAGE_SETTINGS:
-        st.markdown("### ⚙️ 설정")
+        render_page_title("⚙️", "설정")
 
     if active_page == PAGE_SEARCH:
         st.markdown(
