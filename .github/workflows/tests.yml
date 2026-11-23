@@ -20,6 +20,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
       - name: Syntax check
-        run: python -m py_compile app.py supplement_ui.py ux_features.py feature_extras.py
+        run: python -m py_compile app.py supplement_ui.py ux_features.py feature_extras.py visual_analysis.py
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
