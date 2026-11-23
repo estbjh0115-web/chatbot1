@@ -57,7 +57,7 @@ class ThemeTests(unittest.TestCase):
         for title in ('AI 채팅', '문서 내부 검색', '문서 분석', '그림·표 보강',
                       '일괄 질문', '퀴즈', '설정'):
             self.assertIn(f'"{title}")', APP)
-        self.assertEqual(APP.count('render_page_title("'), 7)
+        self.assertEqual(APP.count('render_page_title("'), 8)  # seven menus and welcome screen
         self.assertIn('class="exa-page-title"', APP)
         self.assertIn('.exa-page-title-label', CSS)
         self.assertIn('overflow:visible !important;', CSS)
