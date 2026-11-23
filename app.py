@@ -1739,7 +1739,13 @@ def main() -> None:
         st.info("K-EXAONE 2.5는 텍스트 전용 모델입니다. 이 페이지에서 TXT/MD 보강 파일을 올리거나 직접 설명을 입력해 주세요.")
         doc_index = st.selectbox("대상 PDF", range(len(docs)), format_func=lambda i: docs[i]["name"])
         doc = docs[doc_index]
-        page = st.number_input("페이지 번호", min_value=1, max_value=len(doc["pages"]), value=1, step=1)
+        page = st.selectbox(
+            "페이지 선택",
+            options=range(1, len(doc["pages"]) + 1),
+            format_func=lambda p: f"{p}페이지",
+            key=f"supplement_page_{doc['id']}",
+            help="클릭하면 업로드한 PDF의 전체 페이지가 목록으로 표시됩니다. 원하는 페이지를 선택하세요.",
+        )
         note_key = f"{doc['id']}:{page}"
         left, right = st.columns([1, 1])
         with left:
