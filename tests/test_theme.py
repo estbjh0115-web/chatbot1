@@ -44,6 +44,13 @@ class ThemeTests(unittest.TestCase):
         self.assertIn('overflow-wrap:anywhere !important;', CSS)
         self.assertIn('.exa-search-intro span', CSS)
 
+    def test_sidebar_scrolls_and_long_text_wraps(self):
+        self.assertIn('overflow-y:auto !important;', CSS)
+        self.assertIn('max-height:100dvh !important;', CSS)
+        self.assertIn('Sidebar fit: keep every menu item readable', CSS)
+        self.assertIn('overflow-wrap:anywhere !important;', CSS)
+        self.assertIn('text-overflow:clip !important;', CSS)
+
     def test_no_functionality_removed(self):
         for keyword in (
             "if active_page == PAGE_NOTES:",
