@@ -878,6 +878,71 @@ UI_CSS = r"""
   .welcome-hero .hero-title {font-size:18px;}
   .welcome-hero .hero-desc {font-size:12px;}
 }
+
+/* EXAONE MAIN-CONTRAST HOTFIX v2 */
+/* Sidebar stays light; main content always uses high-contrast light text. */
+[data-testid="stMain"] {
+  color: #F1F4FF !important;
+  --text-color: #F1F4FF;
+  --background-color: #101528;
+  --secondary-background-color: #1C2037;
+  --border-color: #3A4160;
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] {color: #F1F4FF !important;}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] :is(p,li,h1,h2,h3,h4,h5,h6,strong,em) {
+  color: #F1F4FF !important;
+  opacity: 1 !important;
+}
+[data-testid="stMain"] [data-testid="stCaptionContainer"],
+[data-testid="stMain"] [data-testid="stCaptionContainer"] * {
+  color: #C0CBE5 !important;
+  opacity: 1 !important;
+}
+[data-testid="stMain"] [data-testid="stWidgetLabel"],
+[data-testid="stMain"] [data-testid="stWidgetLabel"] *,
+[data-testid="stMain"] label {
+  color: #E8EDFF !important;
+  opacity: 1 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] {
+  background: #1B2138 !important;
+  color: #F2F4FF !important;
+  border: 1px solid #475172 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] details > summary,
+[data-testid="stMain"] [data-testid="stExpander"] details > summary * {
+  color: #F2F4FF !important;
+  opacity: 1 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] details > summary svg,
+[data-testid="stMain"] [data-testid="stExpanderToggleIcon"] {color: #D5DCFC !important;}
+[data-testid="stMain"] [data-testid="stExpander"] details[open] > summary {
+  background: #252B49 !important;
+  border-bottom: 1px solid #475172 !important;
+}
+[data-testid="stMain"] [data-testid="stExpander"] [data-testid="stMarkdownContainer"] * {color: #F1F4FF !important;}
+[data-testid="stMain"] [data-testid="stMetricLabel"],
+[data-testid="stMain"] [data-testid="stMetricLabel"] * {color: #C5D0EB !important;}
+[data-testid="stMain"] [data-testid="stMetricValue"],
+[data-testid="stMain"] [data-testid="stMetricValue"] * {color: #FFFFFF !important;}
+[data-testid="stMain"] [data-testid="stMetricDelta"] * {color: #D6E7FD !important;}
+[data-testid="stMain"] [data-testid="stTabs"] button[role="tab"] * {color: inherit !important;}
+[data-testid="stMain"] [data-testid="stChatInput"] textarea,
+[data-testid="stMain"] [data-testid="stTextArea"] textarea,
+[data-testid="stMain"] [data-testid="stTextInput"] input,
+[data-testid="stMain"] [data-testid="stNumberInput"] input {
+  background: #20263E !important;
+  color: #F8FAFF !important;
+  caret-color: #BCA8FF !important;
+}
+[data-testid="stMain"] [data-testid="stChatInput"] textarea::placeholder,
+[data-testid="stMain"] [data-testid="stTextArea"] textarea::placeholder,
+[data-testid="stMain"] [data-testid="stTextInput"] input::placeholder {
+  color: #AAB8D9 !important;
+  opacity: 1 !important;
+}
+/* Alert messages should keep their own status colors. */
+[data-testid="stMain"] [data-testid="stAlert"] [data-testid="stMarkdownContainer"] * {color: inherit !important;}
 </style>
 """
 
