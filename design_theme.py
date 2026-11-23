@@ -397,6 +397,27 @@ button, input, textarea, select {
   white-space:normal;
   overflow-wrap:anywhere;
 }
+.exa-help-step {
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  padding:6px 0;
+}
+.exa-help-step + .exa-help-step {
+  border-top:1px solid #EFF1F6;
+}
+.exa-help-step-number {
+  flex:0 0 20px;
+  color:#6554D9;
+  font-weight:750;
+  line-height:1.6;
+}
+.exa-help-step-text {
+  flex:1;
+  min-width:0;
+  line-height:1.65;
+}
+.exa-help-paragraph {margin:3px 0 7px;line-height:1.65;}
 .exa-help-wrap:hover .exa-help-popup,
 .exa-help-wrap:focus .exa-help-popup,
 .exa-help-wrap:focus-within .exa-help-popup {
