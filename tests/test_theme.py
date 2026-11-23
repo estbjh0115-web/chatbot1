@@ -51,6 +51,19 @@ class ThemeTests(unittest.TestCase):
         self.assertIn('overflow-wrap:anywhere !important;', CSS)
         self.assertIn('text-overflow:clip !important;', CSS)
 
+    def test_page_titles_use_unclipped_dedicated_component(self):
+        import re
+        self.assertIn('def render_page_title(', APP)
+        for title in ('AI 채팅', '문서 내부 검색', '문서 분석', '그림·표 보강',
+                      '일괄 질문', '퀴즈', '설정'):
+            self.assertIn(f'"{title}")', APP)
+        self.assertEqual(APP.count('render_page_title("'), 7)
+        self.assertIn('class="exa-page-title"', APP)
+        self.assertIn('.exa-page-title-label', CSS)
+        self.assertIn('overflow:visible !important;', CSS)
+        self.assertIn('min-height:48px;', CSS)
+        self.assertIn('line-height:1.5 !important;', CSS)
+
     def test_no_functionality_removed(self):
         for keyword in (
             "if active_page == PAGE_NOTES:",
