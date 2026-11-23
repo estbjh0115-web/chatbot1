@@ -125,6 +125,71 @@ button, input, textarea, select {
   }
 }
 
+/* Sidebar fit: keep every menu item readable and make lower document controls reachable. */
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+  height:100% !important;
+  max-height:100dvh !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+  padding-top:14px !important;
+  padding-bottom:22px !important;
+  min-width:0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] [data-testid="stVerticalBlock"] {
+  gap:0.5rem !important;
+}
+[data-testid="stSidebar"] .sidebar-logo {
+  margin-top:0 !important;
+  margin-bottom:8px !important;
+  padding:11px 12px !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] {
+  gap:2px !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label {
+  min-height:44px !important;
+  padding:8px 12px !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  text-overflow:clip !important;
+  max-width:100% !important;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"],
+[data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"] * {
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  text-overflow:clip !important;
+}
+@media (max-height:760px) {
+  [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+    padding-top:8px !important;
+  }
+  [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"] label {
+    min-height:42px !important;
+    padding:6px 10px !important;
+  }
+}
+/* Make descriptive paragraphs wrap without hiding end-of-line words. */
+[data-testid="stMain"] [data-testid="stCaptionContainer"],
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stMain"] [data-testid="stWidgetLabel"] {
+  max-width:100% !important;
+  min-width:0 !important;
+  overflow:visible !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  text-overflow:clip !important;
+}
+
 /* Sidebar: navigation is physically before upload and API controls. */
 [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
   background: var(--exa-surface) !important;
