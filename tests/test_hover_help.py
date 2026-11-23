@@ -18,6 +18,15 @@ class HoverHelpTests(unittest.TestCase):
         self.assertIn('&lt;script&gt;', result)
         self.assertNotIn('<script>', result)
 
+    def test_numbered_help_uses_separate_rows(self):
+        description = "① PDF 선택 ② 페이지 이동 ③ 내용 저장"
+        result = help_heading("사용법", description)
+        self.assertEqual(result.count('class="exa-help-step"'), 3)
+        self.assertIn('class="exa-help-step-number">①', result)
+        self.assertIn('class="exa-help-step-number">②', result)
+        self.assertIn('class="exa-help-step-number">③', result)
+        self.assertNotIn("① PDF 선택 ② 페이지 이동", result.split('role="tooltip">')[1])
+
     def test_page_audit_uses_hover_help(self):
         app = (ROOT / 'app.py').read_text(encoding='utf-8')
         theme = (ROOT / 'design_theme.py').read_text(encoding='utf-8')
