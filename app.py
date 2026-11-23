@@ -835,12 +835,12 @@ def render_page_title(icon: str, title: str) -> None:
     from html import escape
     safe_icon = escape(icon, quote=True)
     safe_title = escape(title, quote=True)
-    st.markdown(
+    # st.html avoids the Markdown heading wrapper whose line box can crop glyphs.
+    st.html(
         '<div class="exa-page-title" role="heading" aria-level="1">'
         f'<span class="exa-page-title-icon" aria-hidden="true">{safe_icon}</span>'
         f'<span class="exa-page-title-label">{safe_title}</span>'
-        '</div>',
-        unsafe_allow_html=True,
+        '</div>'
     )
 
 
