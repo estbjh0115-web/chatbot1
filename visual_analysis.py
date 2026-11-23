@@ -110,11 +110,17 @@ def extract_native_tables(doc: dict, page_number: int) -> str:
     try:
         if not hasattr(page, "find_tables"):
             raise VisualAnalysisError("현재 PyMuPDF 버전은 표 추출을 지원하지 않습니다.")
+        found = page.find_tables().tables
+        # Many text-layer tables are borderless and need the text strategy.
+        if not found:
+            found = page.find_tables(strategy="text").tables
         lines = []
-        for i, table in enumerate(page.find_tables().tables[:8], 1):
+        for i, table in enumerate(found[:8], 1):
             lines.append(f"[표 {i}]")
             for row in table.extract()[:65]:
-                lines.append(" | ".join(str(c or "").strip().replace("\n", " ") for c in row))
+                cells = [str(c or "").strip().replace("\n", " ") for c in row]
+                if any(cells):
+                    lines.append(" | ".join(cells))
         return "\n".join(lines)[:MAX_REVIEW_CHARS]
     except VisualAnalysisError:
         raise
