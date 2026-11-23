@@ -332,5 +332,80 @@ button, input, textarea, select {
 @media (prefers-reduced-motion:reduce) {
   [data-testid="stApp"] * {transition:none !important;scroll-behavior:auto !important;}
 }
+/* Question mark help: works on hover and keyboard focus. */
+.exa-help-line {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex-wrap:wrap;
+  margin:16px 0 10px;
+  color:#1F2937;
+}
+.exa-help-title {
+  font-size:17px;
+  line-height:1.5;
+  font-weight:700;
+  letter-spacing:-.02em;
+}
+.exa-help-wrap {
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:help;
+  outline-offset:3px;
+  border-radius:50%;
+  z-index:10;
+}
+.exa-help-mark {
+  width:20px;
+  height:20px;
+  border:1px solid #A4ADC0;
+  background:#FFFFFF;
+  color:#586579;
+  font-size:13px;
+  line-height:18px;
+  font-weight:700;
+  border-radius:50%;
+  text-align:center;
+}
+.exa-help-wrap:hover .exa-help-mark,
+.exa-help-wrap:focus .exa-help-mark {
+  color:#6554D9;
+  border-color:#6554D9;
+  background:#F0EDFF;
+}
+.exa-help-popup {
+  position:absolute;
+  left:0;
+  top:calc(100% + 9px);
+  width:min(355px, 68vw);
+  padding:12px 14px;
+  border-radius:11px;
+  border:1px solid #D4CCFB;
+  background:#FFFFFF;
+  color:#1F2937;
+  font-family:var(--exa-font);
+  font-size:13px;
+  font-weight:450;
+  line-height:1.6;
+  box-shadow:0 9px 22px rgba(31,41,55,.14);
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .13s ease;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.exa-help-wrap:hover .exa-help-popup,
+.exa-help-wrap:focus .exa-help-popup,
+.exa-help-wrap:focus-within .exa-help-popup {
+  opacity:1;
+  visibility:visible;
+}
+@media(max-width:650px) {
+  .exa-help-title {font-size:16px;}
+  .exa-help-popup {left:auto;right:-20px;width:min(285px,72vw);}
+}
 </style>
 """
