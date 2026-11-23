@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.pdf
+*.csv
+!연습_질문.csv
